@@ -1,16 +1,15 @@
 #![allow(clippy::undocumented_unsafe_blocks)]
 
 use std::sync::Arc;
-use std::fs;
 
 use eframe::egui_glow;
-use egui::mutex::Mutex;
+use egui::{mutex::Mutex, vec2, Vec2};
 use egui_glow::glow;
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
     rotating_triangle: Arc<Mutex<RotatingTriangle>>,
-    angle: f32,
+    rotation: Vec2
 }
 
 impl MainApp {
@@ -18,7 +17,7 @@ impl MainApp {
         let gl = cc.gl.as_ref()?;
         Some(Self {
             rotating_triangle: Arc::new(Mutex::new(RotatingTriangle::new(gl)?)),
-            angle: 0.0,
+            rotation: vec2(0., 0.)
         })
     }
 }
@@ -57,14 +56,14 @@ impl MainApp {
         let (rect, response) =
             ui.allocate_exact_size(egui::Vec2::splat(1000.0), egui::Sense::drag());
 
-        self.angle += response.drag_motion().x * 0.01;
+        self.rotation += response.drag_motion() * 0.01;
 
         // Clone locals so we can move them into the paint callback:
-        let angle = self.angle;
+        let rotation = self.rotation;
         let rotating_triangle = self.rotating_triangle.clone();
 
         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
-            rotating_triangle.lock().paint(painter.gl(), angle);
+            rotating_triangle.lock().paint(painter.gl(), rotation);
         });
 
         let callback = egui::PaintCallback {
@@ -165,13 +164,14 @@ impl RotatingTriangle {
         }
     }
 
-    fn paint(&self, gl: &glow::Context, angle: f32) {
+    fn paint(&self, gl: &glow::Context, rotation: Vec2) {
         use glow::HasContext as _;
         unsafe {
             gl.use_program(Some(self.program));
-            gl.uniform_1_f32(
-                gl.get_uniform_location(self.program, "u_angle").as_ref(),
-                angle,
+            gl.uniform_2_f32(
+                gl.get_uniform_location(self.program, "u_rotation").as_ref(),
+                rotation.x,
+                rotation.y
             );
             gl.bind_vertex_array(Some(self.vertex_array));
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
