@@ -1,3 +1,4 @@
+precision mediump float;
 const vec2 verts[3] = vec2[3](
     vec2(0.0, 5.0),
     vec2(-2.0, -2.0),
