@@ -2,6 +2,7 @@ precision mediump float;
 in vec4 v_color;
 
 uniform vec2 u_rotation;
+uniform int grid[1331];
 
 out vec4 out_color;
 
@@ -74,7 +75,7 @@ void iterateRayInDirection(inout RayObject ray) {
     step_ray(ray);
     ray.color.x += 1.;
 
-    if (ray.map_pos == ivec3(2, 2, 2)) {
+    if (ray.map_pos == -ivec3(2, 2, 2)) {
       ray.ended_in_hit = true;
       return;
     }
@@ -111,7 +112,7 @@ void main() {
   iterateRayInDirection(ray);
 
   if (ray.ended_in_hit) {
-    out_color = vec4(1.);
+    out_color = vec4(ray.mask, 1.0);
   } else {
     out_color = vec4(ray.color.x, ray_dir.y, ray_dir.z, 1.);
   }

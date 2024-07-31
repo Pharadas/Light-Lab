@@ -167,6 +167,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "as-bytes"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8772b933e929ae5ce35941805f7042afc6dd30fa507cf9385bad7bb46fd35e7"
+
+[[package]]
 name = "as-raw-xcb-connection"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1491,11 +1497,15 @@ dependencies = [
 name = "light_lab"
 version = "0.1.0"
 dependencies = [
+ "as-bytes",
  "eframe",
  "egui",
  "env_logger",
  "log",
+ "math_vector",
  "serde",
+ "slice-of-array",
+ "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
 ]
@@ -1541,6 +1551,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "math_vector"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad0b04d86d1f2c85e149f3a7f25f6e2dadbd0c7bc1549c8841610de2a683a78d"
+dependencies = [
+ "proc_vector",
 ]
 
 [[package]]
@@ -2023,6 +2042,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc_vector"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6cee552131901ddbd806c8c9d200a95ef481a399b78b215c3f00575e11175b7"
+
+[[package]]
 name = "quick-xml"
 version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2265,6 +2290,12 @@ checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "slice-of-array"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4f120bb98cb4cb0dab21c882968c3cbff79dd23b46f07b1cf5c25044945ce84"
 
 [[package]]
 name = "slotmap"
