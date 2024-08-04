@@ -1,13 +1,21 @@
 precision mediump float;
 in vec4 v_color;
 
+struct KeyValue {
+  uint key;
+  uint value;
+};
+
 uniform vec2 u_rotation;
-uniform int grid[1331];
+uniform vec3 position; 
+uniform KeyValue grid[1000];
 
 out vec4 out_color;
 
 // Constants definitions =================================
-const int MAX_RAY_STEPS = 256;
+const int MAX_RAY_STEPS = 1000;
+const ivec3 WORLD_SIZE = ivec3(200, 200, 200);
+const float PI = 3.1416;
 
 // Struct definitions ====================================
 struct RayObject {
@@ -36,7 +44,7 @@ struct RayObject {
   // int optical_objects_through_which_it_passed;
 };
 
-// Math helper functions =================================
+// Math utils functions =================================
 vec3 rotate3dY(vec3 v, float a) {
     float cosA = cos(a);
     float sinA = sin(a);
@@ -57,6 +65,11 @@ vec3 rotate3dX(vec3 v, float a) {
     );
 }
 
+// Hash implementation
+uint hash(ivec3 val) {
+  return uint(uint(val.x + WORLD_SIZE.y * (val.y + WORLD_SIZE.z * val.z)) % uint(1000)) + uint(1);
+}
+
 // Ray marching code
 void step_ray(inout RayObject ray) {
   ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
@@ -74,8 +87,9 @@ void iterateRayInDirection(inout RayObject ray) {
   for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
     step_ray(ray);
     ray.color.x += 1.;
+    uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
 
-    if (ray.map_pos == -ivec3(2, 2, 2)) {
+    if (grid[hashed_value].key != uint(0) || (abs(ray.map_pos.x) > 100 || abs(ray.map_pos.y) > 100 || abs(ray.map_pos.z) > 100)) {
       ray.ended_in_hit = true;
       return;
     }
@@ -97,7 +111,7 @@ void main() {
 
   RayObject ray;
     ray.dir = ray_dir;
-    ray.pos = vec3(0., 0., 0.);
+    ray.pos = position;
     ray.map_pos = ivec3(ray.pos);
     ray.delta_dist = 1.0 / abs(ray.dir);
     ray.step = ivec3(sign(ray.dir));

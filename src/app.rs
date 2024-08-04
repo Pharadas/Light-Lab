@@ -1,13 +1,15 @@
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use std::{cmp::min, fmt::format, sync::Arc};
+use std::{cmp::min, f32::consts::PI, fmt::format, sync::Arc};
 
 use eframe::{egui_glow, glow::HasContext};
 use egui::{mutex::Mutex, vec2, Rect, Vec2};
 use egui_glow::glow;
 use math_vector::Vector;
-use web_sys::console;
+use web_sys::{console, js_sys::Math};
 use ::slice_of_array::prelude::*;
+
+use crate::{camera::{self, Camera}, gpu_hash::{self, GPUHashTable}};
 
 struct Triangle {
     p0: Vector<f32>,
@@ -63,7 +65,7 @@ fn iterate_ray(initial_position: Vector<f32>, end_position: Vector<f32>) -> Vec<
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
     rotating_triangle: Arc<Mutex<MainGlowProgram>>,
-    rotation: Vec2
+    camera: Camera
 }
 
 impl MainApp {
@@ -71,7 +73,7 @@ impl MainApp {
         let gl = cc.gl.as_ref()?;
         Some(Self {
             rotating_triangle: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
-            rotation: vec2(0., 0.)
+            camera: Camera::new()
         })
     }
 }
@@ -91,6 +93,26 @@ impl eframe::App for MainApp {
                     });
 
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
+                        if ui.input(|i| i.key_pressed(egui::Key::A)) {
+                            self.camera.update(egui::Key::A);
+                            console::log_1(&"pressed A".into());
+                        }
+
+                        if ui.input(|i| i.key_pressed(egui::Key::D)) {
+                            self.camera.update(egui::Key::D);
+                            console::log_1(&"pressed D".into());
+                        }
+
+                        if ui.input(|i| i.key_pressed(egui::Key::S)) {
+                            self.camera.update(egui::Key::S);
+                            console::log_1(&"pressed S".into());
+                        }
+
+                        if ui.input(|i| i.key_pressed(egui::Key::W)) {
+                            self.camera.update(egui::Key::W);
+                            console::log_1(&"pressed W".into());
+                        }
+
                         self.custom_painting(ui);
                     });
                 });
@@ -109,12 +131,13 @@ impl MainApp {
         let (rect, response) =
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
-        self.rotation += response.drag_motion() * 0.01;
+        self.camera.look_direction += response.drag_motion() * 0.01;
 
         // Clone locals so we can move them into the paint callback:
-        let rotation = self.rotation;
         let rotating_triangle = self.rotating_triangle.clone();
 
+        // this whole block should only be updated when the figure
+        // experiences a translation
         // create grid to send to gpu
         let sample_triangle = Triangle {
             p0: Vector::new(5.06325, 5.0359793, 5.0420873),
@@ -122,22 +145,26 @@ impl MainApp {
             p2: Vector::new(-5.0645, 5.0365101, 5.0404362),
         };
 
-        let mut cubic_grid = [[[0i32; 11]; 11]; 11];
+        let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
 
         let a_through_b_rasterized = iterate_ray(sample_triangle.p0, sample_triangle.p1);
 
         for position in a_through_b_rasterized {
-            cubic_grid[(position.x + 5) as usize][(position.y + 5) as usize][(position.z + 5) as usize] = 1;
+            gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
             // now just keep firing rays to every position and rasterizing
             let c_through_position_rasterized = iterate_ray(sample_triangle.p2, position.as_f32s() + Vector::new(0.5, 0.5, 0.5));
             // just put it into the grid
             for new_position in c_through_position_rasterized {
-                cubic_grid[(new_position.x + 5) as usize][(new_position.y + 5) as usize][(new_position.z + 5) as usize] = 1;
+                gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
             }
         }
 
+        // console::log_1(&format!("{:?}", gpu_hash).into());
+
+        let sent_camera = self.camera.clone();
+
         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
-            rotating_triangle.lock().paint(painter.gl(), rotation, rect, cubic_grid);
+            rotating_triangle.lock().paint(painter.gl(), sent_camera, rect, &gpu_hash);
         });
 
         let callback = egui::PaintCallback {
@@ -306,7 +333,7 @@ impl MainGlowProgram {
         }
     }
 
-    fn paint(&self, gl: &glow::Context, rotation: Vec2, window_rect: Rect, grid: [[[i32; 11]; 11]; 11]) {
+    fn paint(&self, gl: &glow::Context, camera: Camera, window_rect: Rect, grid: &GPUHashTable) {
         use glow::HasContext as _;
 
         let resolution_multiplier = 0.5;
@@ -339,13 +366,25 @@ impl MainGlowProgram {
 
             gl.uniform_2_f32(
                 gl.get_uniform_location(self.main_image_program, "u_rotation").as_ref(),
-                rotation.x,
-                rotation.y
+                camera.look_direction.x,
+                camera.look_direction.y
             );
+
+            console::log_1(&format!("camera position {:?}", camera.position).into());
+            console::log_1(&format!("camera rotation {:?}", camera.look_direction).into());
+
+            gl.uniform_3_f32(
+                gl.get_uniform_location(self.main_image_program, "position").as_ref(),
+                camera.position.x, 
+                camera.position.y,
+                camera.position.z
+            );
+
+            console::log_1(&format!("{:?}", grid.opengl_compatible_list()).into());
 
             gl.uniform_1_i32_slice(
                 gl.get_uniform_location(self.main_image_program, "grid").as_ref(),
-                vec![grid].flat().flat().flat() // 3 flats for 3 dimensions, sure
+                grid.opengl_compatible_list()
             );
 
             gl.clear_color(0.1, 0.1, 0.1, 1.0);
@@ -363,6 +402,7 @@ impl MainGlowProgram {
             gl.use_program(Some(self.present_program));
 
             gl.bind_vertex_array(Some(self.vertex_array));
+
             gl.uniform_1_i32(
                 gl.get_uniform_location(self.present_program, "screenTexture").as_ref(),
                 0
