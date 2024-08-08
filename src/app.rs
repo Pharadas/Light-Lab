@@ -11,55 +11,83 @@ use ::slice_of_array::prelude::*;
 
 use crate::{camera::{self, Camera}, gpu_hash::{self, GPUHashTable}};
 
+#[derive(Debug)]
 struct Triangle {
     p0: Vector<f32>,
     p1: Vector<f32>,
     p2: Vector<f32>
 }
 
-fn sign(v: Vector<f32>) -> Vector<i32> {
-    let a: i32 = (v.x > 0.0) as i32 - (v.x < 0.0) as i32;
-    let b: i32 = (v.y > 0.0) as i32 - (v.y < 0.0) as i32;
-    let c: i32 = (v.z > 0.0) as i32 - (v.z < 0.0) as i32;
-
-    return Vector::new(a, b, c)
+#[derive(Copy, Clone)]
+enum Max {
+    Steps(usize),
+    Distance(f64),
 }
 
-fn step_ray(mask: &mut Vector<bool>, side_dist: &mut Vector<f32>, delta_dist: Vector<f32>, map_pos: &mut Vector<i32>, step: Vector<i32>) {
-    *mask = Vector::new(
-        side_dist.x <= side_dist.y.min(side_dist.z),
-        side_dist.y <= side_dist.z.min(side_dist.x),
-        side_dist.z <= side_dist.x.min(side_dist.y)
-    );
-
-    let i32_mask = Vector::new(mask.x as i32, mask.y as i32, mask.z as i32);
-
-    *side_dist += i32_mask.as_f32s().mul_components(delta_dist);
-    *map_pos += i32_mask.mul_components(step);
+fn to_f64_slice(a: Vector<f32>) -> [f64; 3] {
+    return [a.x as f64, a.y as f64, a.z as f64];
 }
 
-fn iterate_ray(initial_position: Vector<f32>, end_position: Vector<f32>) -> Vec<Vector<i32>> {
-    // setup ray
-    // this will be way too verbose
-    let direction = (end_position - initial_position).normalize();
-    let mut map_pos:    Vector<i32> = Vector::new(initial_position.x as i32, initial_position.y as i32, initial_position.z as i32);
-    let delta_dist: Vector<f32> = Vector::new(1.0f32 / direction.x.abs(), 1.0f32 / direction.y.abs(), 1.0f32 / direction.z.abs());
-    let step:       Vector<i32> = sign(direction);
-    let mut side_dist:  Vector<f32> = sign(direction).as_f32s().mul_components(map_pos.as_f32s() - initial_position) + ((sign(direction).as_f32s() * 0.5) + Vector::new(0.5, 0.5, 0.5)).mul_components(delta_dist);
-    let mut mask:       Vector<bool> = Vector::new(
-        side_dist.x <= side_dist.y.min(side_dist.z),
-        side_dist.y <= side_dist.z.min(side_dist.x),
-        side_dist.z <= side_dist.x.min(side_dist.y)
-    );
+// Thanks to https://github.com/leroycep/ascii-raycaster/blob/master/src/main.rs
+fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Vector<i32>> {
+    let mut tiles_found: Vec<Vector<i32>> = vec![];
 
-    let mut positions_found: Vec<Vector<i32>> = vec![];
-
-    while map_pos != end_position.as_i32s() {
-        positions_found.push(map_pos.clone()); // not should if i have to clone it but i'd rather be explicit
-        step_ray(&mut mask, &mut side_dist, delta_dist, &mut map_pos, step);
+    let (max_steps, max_distance) = match max {
+        Max::Steps(num) => (num, ::std::f64::INFINITY),
+        Max::Distance(dist) => (::std::usize::MAX, dist),
+    };
+    let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
+    let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
+    let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
+                      (dir2[0]/dir2[1] + 1.0             + dir2[2]/dir2[1]).sqrt(),
+                      (dir2[0]/dir2[2] + dir2[1]/dir2[2] + 1.0            ).sqrt(),
+    ];
+    console::log_1(&format!("{:?}", delta_dist).into());
+    let mut step = [0.0, 0.0, 0.0];
+    let mut side_dist = [0.0, 0.0, 0.0];
+    let mut side;
+    for i in 0..3 {
+        if dir[i] < 0.0 {
+            step[i] = -1.0;
+            side_dist[i] = (pos[i] - map_pos[i]) * delta_dist[i];
+        } else {
+            step[i] = 1.0;
+            side_dist[i] = (map_pos[i] + 1.0 - pos[i]) * delta_dist[i];
+        }
     }
 
-    return positions_found;
+    let mut last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
+
+    for _ in 0..max_steps {
+        if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
+            side_dist[0] += delta_dist[0];
+            map_pos[0] += step[0];
+            side = 1;
+        } else if side_dist[1] < side_dist[2] {
+            side_dist[1] += delta_dist[1];
+            map_pos[1] += step[1];
+            side = 3;
+        } else {
+            side_dist[2] += delta_dist[2];
+            map_pos[2] += step[2];
+            side = 2;
+        }
+        let mut tile = 0;
+        tiles_found.push(Vector::new(map_pos[0] as i32, map_pos[1] as i32, map_pos[2] as i32));
+
+        if (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length() > last_distance { // check that we are getting closer
+            console::log_1(&"exited ray caster when ray passed target".into());
+            return tiles_found;
+        }
+
+        last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
+
+        if map_pos[0] as i32 == end_pos[0] as i32 && map_pos[1] as i32 == end_pos[1] as i32 && map_pos[2] as i32 == end_pos[2] as i32 {
+            console::log_1(&"exited ray caster normally".into());
+            return tiles_found;
+        }
+    }
+    return tiles_found;
 }
 
 pub struct MainApp {
@@ -139,27 +167,39 @@ impl MainApp {
         // this whole block should only be updated when the figure
         // experiences a translation
         // create grid to send to gpu
+        // let sample_triangle = Triangle {
+        //     p0: Vector::new(10.0, 10.0, 10.0),
+        //     p1: Vector::new(-10.0, -10.0, -10.0),
+        //     p2: Vector::new(10.0, -10.0, 10.0),
+        // };
+
         let sample_triangle = Triangle {
-            p0: Vector::new(5.06325, 5.0359793, 5.0420873),
-            p1: Vector::new(-5.06275, 5.0360343, 5.0425949),
-            p2: Vector::new(-5.0645, 5.0365101, 5.0404362),
+            p0: Vector::new(10.3,   10.3, 10.3),
+            p1: Vector::new(-10.3,  10.3, -10.3),
+            p2: Vector::new(-10.3, -10.3, 10.3),
         };
 
         let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
 
-        let a_through_b_rasterized = iterate_ray(sample_triangle.p0, sample_triangle.p1);
+        let a_through_b_rasterized = raymarch(to_f64_slice(sample_triangle.p0), to_f64_slice(sample_triangle.p1 - sample_triangle.p0), to_f64_slice(sample_triangle.p1), Max::Steps(50));
+
+        console::log_1(&format!("final list: {:?}", a_through_b_rasterized).into());
 
         for position in a_through_b_rasterized {
             gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
             // now just keep firing rays to every position and rasterizing
-            let c_through_position_rasterized = iterate_ray(sample_triangle.p2, position.as_f32s() + Vector::new(0.5, 0.5, 0.5));
+            let c_through_position_rasterized = raymarch(to_f64_slice(sample_triangle.p2), to_f64_slice(position.as_f32s() - sample_triangle.p2), to_f64_slice(position.as_f32s()), Max::Steps(50));
+            console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
+
             // just put it into the grid
             for new_position in c_through_position_rasterized {
                 gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
             }
         }
 
-        // console::log_1(&format!("{:?}", gpu_hash).into());
+        gpu_hash.insert(Vector::new(101u32, 101u32, 101u32), 1);
+
+        console::log_1(&format!("gpu hash: {:?}", gpu_hash).into());
 
         let sent_camera = self.camera.clone();
 
@@ -380,12 +420,26 @@ impl MainGlowProgram {
                 camera.position.z
             );
 
-            console::log_1(&format!("{:?}", grid.opengl_compatible_list()).into());
+            let mut list = [0u32; 3000];
+            grid.opengl_compatible_objects_list(&mut list);
 
-            gl.uniform_1_i32_slice(
-                gl.get_uniform_location(self.main_image_program, "grid").as_ref(),
-                grid.opengl_compatible_list()
+            console::log_1(&format!("{:?}", list).into());
+            console::log_1(&format!("{:?}", grid.buckets).into());
+
+            gl.uniform_1_u32_slice(
+                gl.get_uniform_location(self.main_image_program, "buckets").as_ref(),
+                &grid.buckets.as_slice()
             );
+
+            gl.uniform_1_u32_slice(
+                gl.get_uniform_location(self.main_image_program, "objects").as_ref(),
+                &list
+            );
+
+            // gl.uniform_1_i32_slice(
+            //     gl.get_uniform_location(self.main_image_program, "grid").as_ref(),
+            //     vec![grid].flat().flat().flat() // 3 flats for 3 dimensions, sure
+            // );
 
             gl.clear_color(0.1, 0.1, 0.1, 1.0);
             gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);

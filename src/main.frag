@@ -1,14 +1,11 @@
 precision mediump float;
+precision mediump int;
 in vec4 v_color;
-
-struct KeyValue {
-  uint key;
-  uint value;
-};
 
 uniform vec2 u_rotation;
 uniform vec3 position; 
-uniform KeyValue grid[1000];
+uniform uint objects[3000];
+uniform uint buckets[1000];
 
 out vec4 out_color;
 
@@ -16,6 +13,7 @@ out vec4 out_color;
 const int MAX_RAY_STEPS = 1000;
 const ivec3 WORLD_SIZE = ivec3(200, 200, 200);
 const float PI = 3.1416;
+const uint U32_MAX = uint(4294967295);
 
 // Struct definitions ====================================
 struct RayObject {
@@ -67,7 +65,7 @@ vec3 rotate3dX(vec3 v, float a) {
 
 // Hash implementation
 uint hash(ivec3 val) {
-  return uint(uint(val.x + WORLD_SIZE.y * (val.y + WORLD_SIZE.z * val.z)) % uint(1000)) + uint(1);
+  return uint(val.x + WORLD_SIZE.y * (val.y + WORLD_SIZE.z * val.z));
 }
 
 // Ray marching code
@@ -86,10 +84,27 @@ void step_ray(inout RayObject ray) {
 void iterateRayInDirection(inout RayObject ray) {
   for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
     step_ray(ray);
-    ray.color.x += 1.;
     uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
+    uint original_index = hashed_value % uint(1000);
+    uint current_index = buckets[original_index];
 
-    if (grid[hashed_value].key != uint(0) || (abs(ray.map_pos.x) > 100 || abs(ray.map_pos.y) > 100 || abs(ray.map_pos.z) > 100)) {
+    while (objects[(current_index * uint(3)) + uint(2)] != U32_MAX) {
+      if (objects[current_index * uint(3)] == hashed_value) {
+        ray.ended_in_hit = true;
+        return;
+      }
+
+      current_index = objects[(current_index * uint(3)) + uint(2)];
+    }
+
+    if (objects[current_index * uint(3)] == hashed_value) {
+      ray.ended_in_hit = true;
+      return;
+    }
+
+    ray.color *= vec4(0.99, 0.99, 0.99, 1.);
+
+    if (abs(ray.map_pos.x) > 100 || abs(ray.map_pos.y) > 100 || abs(ray.map_pos.z) > 100) {
       ray.ended_in_hit = true;
       return;
     }
@@ -126,7 +141,7 @@ void main() {
   iterateRayInDirection(ray);
 
   if (ray.ended_in_hit) {
-    out_color = vec4(ray.mask, 1.0);
+    out_color = vec4(ray.mask, 1.0) * ray.color;
   } else {
     out_color = vec4(ray.color.x, ray_dir.y, ray_dir.z, 1.);
   }
