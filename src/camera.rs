@@ -13,7 +13,7 @@ impl Camera {
     pub fn new() -> Camera {
         return Camera {
             look_direction: Vec2::new(0.0, 0.0),
-            position: Vector::new(0.0, 0.0, 0.0),
+            position: Vector::new(50., 50., 50.),
             up: Vector::new(0.0, 1.0, 0.0)
         }
     }
@@ -58,8 +58,11 @@ impl Camera {
 
         // self.rotate3d_x(&mut movement);
         // self.rotate3d_y(&mut movement);
-        movement = movement.normalize();
+        movement = movement.normalize() * 2.0;
 
         self.position += movement;
+        self.position.x = self.position.x.clamp(2.0, 100.);
+        self.position.y = self.position.y.clamp(2.0, 100.);
+        self.position.z = self.position.z.clamp(2.0, 100.);
     }
 }

@@ -160,51 +160,15 @@ impl MainApp {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
         self.camera.look_direction += response.drag_motion() * 0.01;
+        self.camera.look_direction.y = self.camera.look_direction.y.clamp(-1.4, 1.4);
 
         // Clone locals so we can move them into the paint callback:
-        let rotating_triangle = self.rotating_triangle.clone();
-
-        // this whole block should only be updated when the figure
-        // experiences a translation
-        // create grid to send to gpu
-        // let sample_triangle = Triangle {
-        //     p0: Vector::new(10.0, 10.0, 10.0),
-        //     p1: Vector::new(-10.0, -10.0, -10.0),
-        //     p2: Vector::new(10.0, -10.0, 10.0),
-        // };
-
-        let sample_triangle = Triangle {
-            p0: Vector::new(10.3,   10.3, 10.3),
-            p1: Vector::new(-10.3,  10.3, -10.3),
-            p2: Vector::new(-10.3, -10.3, 10.3),
-        };
-
-        let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
-
-        let a_through_b_rasterized = raymarch(to_f64_slice(sample_triangle.p0), to_f64_slice(sample_triangle.p1 - sample_triangle.p0), to_f64_slice(sample_triangle.p1), Max::Steps(50));
-
-        console::log_1(&format!("final list: {:?}", a_through_b_rasterized).into());
-
-        for position in a_through_b_rasterized {
-            gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
-            // now just keep firing rays to every position and rasterizing
-            let c_through_position_rasterized = raymarch(to_f64_slice(sample_triangle.p2), to_f64_slice(position.as_f32s() - sample_triangle.p2), to_f64_slice(position.as_f32s()), Max::Steps(50));
-            console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
-
-            // just put it into the grid
-            for new_position in c_through_position_rasterized {
-                gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
-            }
-        }
-
-        gpu_hash.insert(Vector::new(101u32, 101u32, 101u32), 1);
-
-        console::log_1(&format!("gpu hash: {:?}", gpu_hash).into());
-
+        let rotating_triangle = self.glow_program.clone();
         let sent_camera = self.camera.clone();
+        let world = self.world.clone();
 
         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
-            rotating_triangle.lock().paint(painter.gl(), sent_camera, rect, &gpu_hash);
+            rotating_triangle.lock().paint(painter.gl(), sent_camera, rect, &world);
         });
 
         let callback = egui::PaintCallback {

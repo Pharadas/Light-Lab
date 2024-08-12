@@ -102,12 +102,21 @@ void iterateRayInDirection(inout RayObject ray) {
       return;
     }
 
-    ray.color *= vec4(0.99, 0.99, 0.99, 1.);
+    if ((ray.map_pos.x > 100 || ray.map_pos.x <= 0) || 
+        (ray.map_pos.y > 100 || ray.map_pos.y <= 0) ||
+        (ray.map_pos.z > 100 || ray.map_pos.z <= 0)
+    ) {
+      ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+      ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
 
-    if (abs(ray.map_pos.x) > 100 || abs(ray.map_pos.y) > 100 || abs(ray.map_pos.z) > 100) {
+      float h = 2.0 + checker(ray.current_real_position);
+      ray.color *= vec4(h, h, h, 1);
+
       ray.ended_in_hit = true;
       return;
     }
+
+    step_ray(ray);
   }
 }
 
