@@ -1,107 +1,33 @@
 #![allow(clippy::undocumented_unsafe_blocks)]
 
-use std::{cmp::min, f32::consts::PI, fmt::format, sync::Arc};
+use std::sync::Arc;
 
+use as_bytes::AsBytes;
 use eframe::{egui_glow, glow::HasContext};
-use egui::{mutex::Mutex, vec2, Rect, Vec2};
+use egui::{color_picker::{color_picker_color32, Alpha}, epaint::color, mutex::Mutex, Color32, Rect, RichText, Widget, WidgetText};
 use egui_glow::glow;
-use math_vector::Vector;
-use web_sys::{console, js_sys::Math};
-use ::slice_of_array::prelude::*;
+use web_sys::console;
 
-use crate::{camera::{self, Camera}, gpu_hash::{self, GPUHashTable}};
-
-#[derive(Debug)]
-struct Triangle {
-    p0: Vector<f32>,
-    p1: Vector<f32>,
-    p2: Vector<f32>
-}
-
-#[derive(Copy, Clone)]
-enum Max {
-    Steps(usize),
-    Distance(f64),
-}
-
-fn to_f64_slice(a: Vector<f32>) -> [f64; 3] {
-    return [a.x as f64, a.y as f64, a.z as f64];
-}
-
-// Thanks to https://github.com/leroycep/ascii-raycaster/blob/master/src/main.rs
-fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Vector<i32>> {
-    let mut tiles_found: Vec<Vector<i32>> = vec![];
-
-    let (max_steps, max_distance) = match max {
-        Max::Steps(num) => (num, ::std::f64::INFINITY),
-        Max::Distance(dist) => (::std::usize::MAX, dist),
-    };
-    let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
-    let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
-    let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
-                      (dir2[0]/dir2[1] + 1.0             + dir2[2]/dir2[1]).sqrt(),
-                      (dir2[0]/dir2[2] + dir2[1]/dir2[2] + 1.0            ).sqrt(),
-    ];
-    console::log_1(&format!("{:?}", delta_dist).into());
-    let mut step = [0.0, 0.0, 0.0];
-    let mut side_dist = [0.0, 0.0, 0.0];
-    let mut side;
-    for i in 0..3 {
-        if dir[i] < 0.0 {
-            step[i] = -1.0;
-            side_dist[i] = (pos[i] - map_pos[i]) * delta_dist[i];
-        } else {
-            step[i] = 1.0;
-            side_dist[i] = (map_pos[i] + 1.0 - pos[i]) * delta_dist[i];
-        }
-    }
-
-    let mut last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
-
-    for _ in 0..max_steps {
-        if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
-            side_dist[0] += delta_dist[0];
-            map_pos[0] += step[0];
-            side = 1;
-        } else if side_dist[1] < side_dist[2] {
-            side_dist[1] += delta_dist[1];
-            map_pos[1] += step[1];
-            side = 3;
-        } else {
-            side_dist[2] += delta_dist[2];
-            map_pos[2] += step[2];
-            side = 2;
-        }
-        let mut tile = 0;
-        tiles_found.push(Vector::new(map_pos[0] as i32, map_pos[1] as i32, map_pos[2] as i32));
-
-        if (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length() > last_distance { // check that we are getting closer
-            console::log_1(&"exited ray caster when ray passed target".into());
-            return tiles_found;
-        }
-
-        last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
-
-        if map_pos[0] as i32 == end_pos[0] as i32 && map_pos[1] as i32 == end_pos[1] as i32 && map_pos[2] as i32 == end_pos[2] as i32 {
-            console::log_1(&"exited ray caster normally".into());
-            return tiles_found;
-        }
-    }
-    return tiles_found;
-}
+use crate::{camera::Camera, menus::{MenusState, OpticalObject}, rasterizer::World};
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
-    rotating_triangle: Arc<Mutex<MainGlowProgram>>,
-    camera: Camera
+    glow_program: Arc<Mutex<MainGlowProgram>>,
+    world: World,
+    camera: Camera,
+    time: f64,
+    menus: MenusState,
 }
 
 impl MainApp {
     pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
         let gl = cc.gl.as_ref()?;
         Some(Self {
-            rotating_triangle: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
-            camera: Camera::new()
+            glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
+            camera: Camera::new(),
+            world: World::new(),
+            time: 0.0,
+            menus: MenusState::new()
         })
     }
 }
@@ -112,12 +38,13 @@ impl eframe::App for MainApp {
             egui::ScrollArea::both()
                 .auto_shrink(false)
                 .show(ui, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing.x = 0.0;
+                    egui::Window::new("Main menu").show(ctx, |ui| {
+                        ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
                     });
 
-                    egui::Window::new("My Window").show(ctx, |ui| {
-                       ui.label("Hello World!");
+                    egui::Window::new("Object creator").show(ctx, |ui| {
+                        self.menus.select_object_menu(ui, &mut self.world, &self.camera.position);
+                        // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
                     });
 
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
@@ -140,16 +67,16 @@ impl eframe::App for MainApp {
                             self.camera.update(egui::Key::W);
                             console::log_1(&"pressed W".into());
                         }
-
-                        self.custom_painting(ui);
                     });
+
+                    self.custom_painting(ui);
                 });
         });
     }
 
     fn on_exit(&mut self, gl: Option<&glow::Context>) {
         if let Some(gl) = gl {
-            self.rotating_triangle.lock().destroy(gl);
+            self.glow_program.lock().destroy(gl);
         }
     }
 }
@@ -158,6 +85,8 @@ impl MainApp {
     fn custom_painting(&mut self, ui: &mut egui::Ui) {
         let (rect, response) =
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
+
+        // console::log_1(response.clicked().)
 
         self.camera.look_direction += response.drag_motion() * 0.01;
         self.camera.look_direction.y = self.camera.look_direction.y.clamp(-1.4, 1.4);
@@ -183,7 +112,8 @@ struct MainGlowProgram {
     main_image_program: glow::Program,
     present_program: glow::Program,
     vertex_array: glow::VertexArray,
-    // faces_buffer: glow::Buffer
+    current_texture_resolution: [i32; 2],
+    objects_found: Vec<u8>
 }
 
 #[allow(unsafe_code)] // we need unsafe code to use glow
@@ -324,6 +254,8 @@ impl MainGlowProgram {
                 main_image_program: offscreen_program,
                 present_program: present_to_screen_program,
                 vertex_array,
+                current_texture_resolution: [0, 0],
+                objects_found: vec![0u8]
             })
         }
     }
@@ -337,7 +269,7 @@ impl MainGlowProgram {
         }
     }
 
-    fn paint(&self, gl: &glow::Context, camera: Camera, window_rect: Rect, grid: &GPUHashTable) {
+    fn paint(&mut self, gl: &glow::Context, camera: Camera, window_rect: Rect, world: &World) {
         use glow::HasContext as _;
 
         let resolution_multiplier = 0.5;
@@ -345,28 +277,36 @@ impl MainGlowProgram {
         unsafe {
             gl.use_program(Some(self.main_image_program));
 
+            // let objects_buffer = gl.create_buffer().unwrap();
+            // gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(objects_buffer));
+            // gl.buffer_data_u8_slice(glow::SHADER_STORAGE_BUFFER, [1u32].as_bytes(), glow::DYNAMIC_READ);
+            // gl.bind_buffer_base(glow::SHADER_STORAGE_BUFFER, 2, Some(objects_buffer));
+
             let texture_resolution = [(window_rect.width() * resolution_multiplier) as i32, (window_rect.height() * resolution_multiplier) as i32];
+
+            self.current_texture_resolution = texture_resolution;
 
             let framebuffer = gl.create_framebuffer().unwrap();
             gl.bind_framebuffer(glow::FRAMEBUFFER, Some(framebuffer));
 
-            let texture_color_buffer = gl.create_texture().unwrap();
-            gl.bind_texture(glow::TEXTURE_2D, Some(texture_color_buffer));
+            let color_buffer = gl.create_texture().unwrap();
+            gl.bind_texture(glow::TEXTURE_2D, Some(color_buffer));
             gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::RGB as i32, texture_resolution[0], texture_resolution[1], 0, glow::RGB, glow::UNSIGNED_BYTE, None);
             gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
             gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
-            gl.framebuffer_texture_2d(glow::FRAMEBUFFER, glow::COLOR_ATTACHMENT0, glow::TEXTURE_2D, Some(texture_color_buffer), 0);
+            gl.framebuffer_texture_2d(glow::FRAMEBUFFER, glow::COLOR_ATTACHMENT0, glow::TEXTURE_2D, Some(color_buffer), 0);
+
+            let object_found = gl.create_texture().unwrap();
+            gl.bind_texture(glow::TEXTURE_2D, Some(object_found));
+            gl.tex_image_2d(glow::TEXTURE_2D, 0, glow::RGB as i32, texture_resolution[0], texture_resolution[1], 0, glow::RGB, glow::UNSIGNED_BYTE, None);
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MIN_FILTER, glow::LINEAR as i32);
+            gl.tex_parameter_i32(glow::TEXTURE_2D, glow::TEXTURE_MAG_FILTER, glow::LINEAR as i32);
+            gl.framebuffer_texture_2d(glow::FRAMEBUFFER, glow::COLOR_ATTACHMENT1, glow::TEXTURE_2D, Some(object_found), 0);
 
             let rbo = gl.create_renderbuffer().unwrap();
             gl.bind_renderbuffer(glow::RENDERBUFFER, Some(rbo));
             gl.renderbuffer_storage(glow::RENDERBUFFER, glow::DEPTH24_STENCIL8, texture_resolution[0], texture_resolution[1]);
             gl.framebuffer_renderbuffer(glow::FRAMEBUFFER, glow::DEPTH_STENCIL_ATTACHMENT, glow::RENDERBUFFER, Some(rbo));
-
-            gl.bind_framebuffer(glow::FRAMEBUFFER, None);
-
-            // now this should happen every frame
-            gl.bind_framebuffer(glow::FRAMEBUFFER, Some(framebuffer));
-            gl.enable(glow::DEPTH_TEST);
 
             gl.uniform_2_f32(
                 gl.get_uniform_location(self.main_image_program, "u_rotation").as_ref(),
@@ -374,8 +314,8 @@ impl MainGlowProgram {
                 camera.look_direction.y
             );
 
-            console::log_1(&format!("camera position {:?}", camera.position).into());
-            console::log_1(&format!("camera rotation {:?}", camera.look_direction).into());
+            // console::log_1(&format!("camera position {:?}", camera.position).into());
+            // console::log_1(&format!("camera rotation {:?}", camera.look_direction).into());
 
             gl.uniform_3_f32(
                 gl.get_uniform_location(self.main_image_program, "position").as_ref(),
@@ -385,25 +325,20 @@ impl MainGlowProgram {
             );
 
             let mut list = [0u32; 3000];
-            grid.opengl_compatible_objects_list(&mut list);
+            world.hash_map.opengl_compatible_objects_list(&mut list);
 
-            console::log_1(&format!("{:?}", list).into());
-            console::log_1(&format!("{:?}", grid.buckets).into());
+            // console::log_1(&format!("{:?}", list).into());
+            // console::log_1(&format!("{:?}", world.hash_map.buckets).into());
 
             gl.uniform_1_u32_slice(
                 gl.get_uniform_location(self.main_image_program, "buckets").as_ref(),
-                &grid.buckets.as_slice()
+                &world.hash_map.buckets.as_slice()
             );
 
             gl.uniform_1_u32_slice(
                 gl.get_uniform_location(self.main_image_program, "objects").as_ref(),
                 &list
             );
-
-            // gl.uniform_1_i32_slice(
-            //     gl.get_uniform_location(self.main_image_program, "grid").as_ref(),
-            //     vec![grid].flat().flat().flat() // 3 flats for 3 dimensions, sure
-            // );
 
             gl.clear_color(0.1, 0.1, 0.1, 1.0);
             gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
@@ -412,8 +347,35 @@ impl MainGlowProgram {
             gl.bind_vertex_array(Some(self.vertex_array));
 
             gl.active_texture(glow::TEXTURE0);
+            gl.draw_buffers(&[glow::COLOR_ATTACHMENT0, glow::COLOR_ATTACHMENT1]);
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
 
+            gl.bind_texture(glow::TEXTURE_2D, Some(object_found));
+            gl.framebuffer_texture_2d(glow::FRAMEBUFFER, glow::COLOR_ATTACHMENT1, glow::TEXTURE_2D, Some(object_found), 0);
+            gl.pixel_store_i32(glow::PACK_ALIGNMENT, 4);
+
+            // read the texture contents
+            let mut buffer = vec![0u8; (texture_resolution[0] * texture_resolution[1] * 4) as usize];
+
+            gl.read_buffer(glow::COLOR_ATTACHMENT1);
+            if gl.check_framebuffer_status(glow::FRAMEBUFFER) == glow::FRAMEBUFFER_COMPLETE {
+                gl.read_pixels(
+                    0, 
+                    0, 
+                    texture_resolution[0],
+                    texture_resolution[1],
+                    glow::RGBA,
+                    glow::UNSIGNED_BYTE,
+                    glow::PixelPackData::Slice(&mut buffer)
+                );
+                // console::log_1(&format!("{:?}", buffer).into());
+            } else {
+                console::log_1(&format!("couldnt read framebuffer as it wasnt done").into());
+            }
+
+            self.objects_found = buffer;
+
+            // present to screen
             gl.bind_framebuffer(glow::FRAMEBUFFER, None);
             gl.disable(glow::DEPTH_TEST);
 
@@ -432,11 +394,12 @@ impl MainGlowProgram {
                 window_rect.height()
             );
 
-            gl.bind_texture(glow::TEXTURE_2D, Some(texture_color_buffer));
+            gl.bind_texture(glow::TEXTURE_2D, Some(color_buffer));
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
 
             // probably not the most efficient but oh well
-            gl.delete_texture(texture_color_buffer);
+            gl.delete_texture(color_buffer);
+            gl.delete_texture(object_found);
             gl.delete_renderbuffer(rbo);
             gl.delete_framebuffer(framebuffer)
         }

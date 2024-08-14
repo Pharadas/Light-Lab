@@ -7,7 +7,8 @@ uniform vec3 position;
 uniform uint objects[3000];
 uniform uint buckets[1000];
 
-out vec4 out_color;
+layout(location = 0) out vec4 out_color;
+layout(location = 1) out vec4 object_found;
 
 // Constants definitions =================================
 const int MAX_RAY_STEPS = 1000;
@@ -38,6 +39,7 @@ struct RayObject {
   bool ended_in_hit;
 
   vec4 color;
+  uint object_hit;
   // Complex2x2Matrix optical_objects_found_product;
   // int optical_objects_through_which_it_passed;
 };
@@ -63,6 +65,11 @@ vec3 rotate3dX(vec3 v, float a) {
     );
 }
 
+float checker(vec3 p) {
+  float t = 10.0;
+  return step(0.0, sin(PI * p.x + PI/t)*sin(PI *p.y + PI/t)*sin(PI *p.z + PI/t));
+}
+
 // Hash implementation
 uint hash(ivec3 val) {
   return uint(val.x + WORLD_SIZE.y * (val.y + WORLD_SIZE.z * val.z));
@@ -83,7 +90,6 @@ void step_ray(inout RayObject ray) {
 // Optical Object: will multiply it's internal jones matrix and continue iterating
 void iterateRayInDirection(inout RayObject ray) {
   for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
-    step_ray(ray);
     uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
     uint original_index = hashed_value % uint(1000);
     uint current_index = buckets[original_index];
@@ -91,6 +97,7 @@ void iterateRayInDirection(inout RayObject ray) {
     while (objects[(current_index * uint(3)) + uint(2)] != U32_MAX) {
       if (objects[current_index * uint(3)] == hashed_value) {
         ray.ended_in_hit = true;
+        ray.object_hit = current_index + uint(1);
         return;
       }
 
@@ -99,6 +106,7 @@ void iterateRayInDirection(inout RayObject ray) {
 
     if (objects[current_index * uint(3)] == hashed_value) {
       ray.ended_in_hit = true;
+      ray.object_hit = current_index + uint(1);
       return;
     }
 
@@ -108,6 +116,7 @@ void iterateRayInDirection(inout RayObject ray) {
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
+      ray.object_hit = uint(0);
 
       float h = 2.0 + checker(ray.current_real_position);
       ray.color *= vec4(h, h, h, 1);
@@ -124,7 +133,7 @@ void main() {
   vec2 viewport_dimensions = vec2(750., 750.);
   vec2 screen_pos = ((gl_FragCoord.xy / viewport_dimensions) * 2.) - 1.;
 
-  vec3 camera_dir = vec3(0.0, 0.0, 1.0);
+  vec3 camera_dir = vec3(0.0, 0.0, 0.9);
   vec3 camera_plane_u = vec3(1.0, 0.0, 0.0);
   vec3 camera_plane_v = vec3(0.0, 1.0, 0.0);
 
@@ -149,8 +158,10 @@ void main() {
 
   iterateRayInDirection(ray);
 
+  object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
+
   if (ray.ended_in_hit) {
-    out_color = vec4(ray.mask, 1.0) * ray.color;
+    out_color = vec4(vec3(ray.mask) * 0.2, 1.0) * ray.color;
   } else {
     out_color = vec4(ray.color.x, ray_dir.y, ray_dir.z, 1.);
   }
