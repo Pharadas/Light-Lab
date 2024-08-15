@@ -24,7 +24,7 @@ as-bytes = "0.2.0"
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
 math_vector = "0.2.1"
-
+egui_plot = "0.28.1"
 wasm-bindgen = "0.2"
 slice-of-array = "0.3.2"
 
@@ -34,6 +34,14 @@ features = [
   "Window",
   "console"
 ]
+
+# [dev-dependencies]
+# glow = "0.10.0"
+# glutin = "0.27.0"
+# imgui-glow-renderer = "0.8.3"
+# imgui-winit-support = "0.8.2"
+# imgui = "0.8.2"
+# rand = "0.8.4"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

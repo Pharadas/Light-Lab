@@ -1,6 +1,8 @@
 use std::fmt::{self, Display, Formatter};
-use egui::{self, Button, Ui};
+use egui::{self, Button, Color32, Ui};
 use math_vector::Vector;
+use egui_plot::{Line, Plot, PlotItem, PlotPoints};
+use web_sys::console;
 
 use crate::rasterizer::World;
 
@@ -35,6 +37,26 @@ impl MenusState {
         return MenusState {
             selected_object: OpticalObject::LightSource
         };
+    }
+
+    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World) {
+        let sin: PlotPoints = (-500..500).map(|i| {
+            let x = i as f64 * 0.01;
+            [x, x.sin()]
+        }).collect();
+        let line = Line::new(sin).color(Color32::from_rgb(255, 0, 0));
+
+        let neg_sin: PlotPoints = (-500..500).map(|i| {
+            let x = i as f64 * 0.01;
+            [x, -x.sin()]
+        }).collect();
+        let neg_line = Line::new(neg_sin).color(Color32::from_rgb(255, 0, 0));
+
+        Plot::new("my_plot").allow_drag(false).allow_boxed_zoom(false).allow_zoom(false).view_aspect(2.0).show(ui, |plot_ui| {
+            console::log_1(&format!("{:?}", plot_ui.pointer_coordinate_drag_delta()).into());
+            plot_ui.line(line);
+            plot_ui.line(neg_line);
+        });
     }
 
     pub fn select_object_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {

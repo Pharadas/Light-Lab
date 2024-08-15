@@ -58,7 +58,7 @@ impl Camera {
 
         // self.rotate3d_x(&mut movement);
         // self.rotate3d_y(&mut movement);
-        movement = movement.normalize() * 2.0;
+        movement = movement.normalize() * 0.5;
 
         self.position += movement;
         self.position.x = self.position.x.clamp(2.0, 100.);

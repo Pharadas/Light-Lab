@@ -42,6 +42,11 @@ impl eframe::App for MainApp {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
                     });
 
+                    egui::Window::new("Object inspector").show(ctx, |ui| {
+                        self.menus.inspect_object_menu(ui, &mut self.world);
+                        // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
+                    });
+
                     egui::Window::new("Object creator").show(ctx, |ui| {
                         self.menus.select_object_menu(ui, &mut self.world, &self.camera.position);
                         // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
@@ -88,6 +93,8 @@ impl MainApp {
 
         // console::log_1(response.clicked().)
 
+        self.time += 0.01;
+
         self.camera.look_direction += response.drag_motion() * 0.01;
         self.camera.look_direction.y = self.camera.look_direction.y.clamp(-1.4, 1.4);
 
@@ -95,9 +102,10 @@ impl MainApp {
         let rotating_triangle = self.glow_program.clone();
         let sent_camera = self.camera.clone();
         let world = self.world.clone();
+        let time = self.time.clone();
 
         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
-            rotating_triangle.lock().paint(painter.gl(), sent_camera, rect, &world);
+            rotating_triangle.lock().paint(painter.gl(), sent_camera, rect, &world, time as f32);
         });
 
         let callback = egui::PaintCallback {
@@ -139,8 +147,8 @@ impl MainGlowProgram {
             }
 
             let (vertex_shader_source, fragment_shader_source) = (
-                include_str!("./main.vert"),
-                include_str!("./main.frag")
+                include_str!("./gpu-code/main.vert"),
+                include_str!("./gpu-code/main.frag")
             );
 
             let shader_sources = [
@@ -199,8 +207,8 @@ impl MainGlowProgram {
             }
 
             let (vertex_shader_source, fragment_shader_source) = (
-                include_str!("./present.vert"),
-                include_str!("./present.frag")
+                include_str!("./gpu-code/present.vert"),
+                include_str!("./gpu-code/present.frag")
             );
 
             let shader_sources = [
@@ -269,7 +277,7 @@ impl MainGlowProgram {
         }
     }
 
-    fn paint(&mut self, gl: &glow::Context, camera: Camera, window_rect: Rect, world: &World) {
+    fn paint(&mut self, gl: &glow::Context, camera: Camera, window_rect: Rect, world: &World, time: f32) {
         use glow::HasContext as _;
 
         let resolution_multiplier = 0.5;
@@ -329,6 +337,11 @@ impl MainGlowProgram {
 
             // console::log_1(&format!("{:?}", list).into());
             // console::log_1(&format!("{:?}", world.hash_map.buckets).into());
+
+            gl.uniform_1_f32(
+                gl.get_uniform_location(self.main_image_program, "time").as_ref(),
+                time
+            );
 
             gl.uniform_1_u32_slice(
                 gl.get_uniform_location(self.main_image_program, "buckets").as_ref(),
