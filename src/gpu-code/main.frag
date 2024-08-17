@@ -1164,18 +1164,33 @@ void iterateRayInDirection(inout RayObject ray) {
     uint original_index = hashed_value % uint(1000);
     uint current_index = buckets[original_index];
 
+    vec3 quad_hit_position = quadIntersect(
+      ray.pos, 
+      ray.dir, 
+      vec3(49.9, 49.4, 51.2), 
+      vec3(49.5, 49.2, 51.2), 
+      vec3(49.5, 49.2, 51.8), 
+      vec3(49.5, 49.8, 51.8)
+    );
+
     // TEMPORAL check if it hits a random plane
-    if (ray.map_pos == ivec3(50, 50, 50) &&
+    if (ray.map_pos == ivec3(49, 49, 51) &&
       (
-        length(quadIntersect(
-          ray.pos, 
-          ray.dir, 
-          vec3(50.5, 50.8, 50.2), 
-          vec3(50.5, 50.2, 50.2), 
-          vec3(50.5, 50.2, 50.8), 
-          vec3(50.5, 50.8, 50.8)
-        )) < 0.2
+        length(quad_hit_position) < 0.2
       )) {
+      // ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+      // ray.current_real_position = vec3(50.5, 50.8, 50.2) + quad_hit_position;
+      // ray.distance_traveled = length(ray.current_real_position - ray.pos);
+
+      // ray.distance_traveled += length((quad_hit_position + quad_center) - ray.current_real_position);
+      // ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
+
+      ray.object_hit = uint(0);
+
+      float h = 2.0 + checker(quad_hit_position * 10.0);
+      ray.color *= vec4(h, h, h, 1);
+      ray.object_hit = uint(1);
+
       ray.ended_in_hit = true;
       return;
     }

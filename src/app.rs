@@ -24,8 +24,8 @@ impl MainApp {
         let gl = cc.gl.as_ref()?;
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
-            camera: Camera::new(),
             world: World::new(),
+            camera: Camera::new(),
             time: 0.0,
             menus: MenusState::new()
         })
@@ -91,7 +91,35 @@ impl MainApp {
         let (rect, response) =
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
-        // console::log_1(response.clicked().)
+        let curr_response = ui.interact(ui.min_rect(), egui::Id::new("Some Id"), egui::Sense::click());
+        let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
+        let objects_found = self.glow_program.lock().objects_found.clone();
+
+        if curr_response.clicked() {
+            console::log_1(&format!("original hover position: {:?}", curr_response.hover_pos()).into());
+            console::log_1(&format!("current texture resolution: {:?}", self.glow_program.lock().current_texture_resolution).into());
+            console::log_1(&format!("current ui right bottom: {:?}", rect.right_bottom().x).into());
+
+            let texture_coordinates_hover_pos = [
+                ((curr_response.hover_pos().unwrap().x * current_texture_resolution[0] as f32) / rect.right_bottom().x) as i32,
+                ((curr_response.hover_pos().unwrap().y * current_texture_resolution[1] as f32) / rect.right_bottom().y) as i32
+            ];
+
+            console::log_1(&format!("texture coordinates hover position: {:?}", texture_coordinates_hover_pos).into());
+
+            // console::log_1(&format!("value at texture space coordinates: {:?}", objects_found.len()).into());
+            console::log_1(&format!("vectors found: {:?}", objects_found.len() / 4).into());
+            console::log_1(&format!("value at texture space coordinates: {:?}", objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize]).into());
+            console::log_1(&format!("objects found: {:?}", objects_found).into());
+
+            // check what the user clicked
+            // if the user clicked an object in the world, let's highglight it
+        }
+
+        if response.clicked_elsewhere() {
+        //     console::log_1(&format!("main window clicked!").into());
+            console::log_1(&format!("{:?}", response.hover_pos()).into());
+        }
 
         self.time += 0.01;
 
@@ -401,13 +429,22 @@ impl MainGlowProgram {
                 0
             );
 
+            gl.uniform_1_i32(
+                gl.get_uniform_location(self.present_program, "objects_found").as_ref(),
+                1
+            );
+
             gl.uniform_2_f32(
                 gl.get_uniform_location(self.present_program, "viewport_dimensions").as_ref(),
                 window_rect.width(),
                 window_rect.height()
             );
 
+            gl.active_texture(glow::TEXTURE0);
             gl.bind_texture(glow::TEXTURE_2D, Some(color_buffer));
+
+            gl.active_texture(glow::TEXTURE1);
+            gl.bind_texture(glow::TEXTURE_2D, Some(object_found));
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
 
             // probably not the most efficient but oh well
