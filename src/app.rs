@@ -113,9 +113,6 @@ impl MainApp {
 
             // console::log_1(&format!("value at texture space coordinates: {:?}", objects_found.len()).into());
             console::log_1(&format!("value at texture space coordinates: {:?}", objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize]).into());
-
-            // check what the user clicked
-            // if the user clicked an object in the world, let's highglight it
         }
 
         if response.clicked_elsewhere() {
@@ -450,6 +447,11 @@ impl MainGlowProgram {
                 gl.get_uniform_location(self.present_program, "viewport_dimensions").as_ref(),
                 window_rect.width(),
                 window_rect.height()
+            );
+
+            gl.uniform_1_u32(
+                gl.get_uniform_location(self.present_program, "selected_object").as_ref(),
+                self.currently_selected_object as u32
             );
 
             console::log_1(&format!("{:?}", texture_resolution).into());
