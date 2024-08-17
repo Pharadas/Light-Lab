@@ -40,12 +40,15 @@ impl eframe::App for MainApp {
                 .show(ui, |ui| {
                     egui::Window::new("Main menu").show(ctx, |ui| {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"));
                     });
 
-                    egui::Window::new("Object inspector").show(ctx, |ui| {
-                        self.menus.inspect_object_menu(ui, &mut self.world);
-                        // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
-                    });
+                    if self.glow_program.lock().currently_selected_object != 0 {
+                        egui::Window::new("Object inspector").show(ctx, |ui| {
+                            self.menus.inspect_object_menu(ui, &mut self.world);
+                            // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
+                        });
+                    }
 
                     egui::Window::new("Object creator").show(ctx, |ui| {
                         self.menus.select_object_menu(ui, &mut self.world, &self.camera.position);
@@ -97,8 +100,6 @@ impl MainApp {
 
         if curr_response.clicked() {
             console::log_1(&format!("original hover position: {:?}", curr_response.hover_pos()).into());
-            console::log_1(&format!("current texture resolution: {:?}", self.glow_program.lock().current_texture_resolution).into());
-            console::log_1(&format!("current ui right bottom: {:?}", rect.right_bottom().x).into());
 
             let texture_coordinates_hover_pos = [
                 ((curr_response.hover_pos().unwrap().x * current_texture_resolution[0] as f32) / rect.right_bottom().x) as i32,
@@ -107,10 +108,11 @@ impl MainApp {
 
             console::log_1(&format!("texture coordinates hover position: {:?}", texture_coordinates_hover_pos).into());
 
+            let object_found_index = objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize];
+            self.glow_program.lock().currently_selected_object = object_found_index as usize;
+
             // console::log_1(&format!("value at texture space coordinates: {:?}", objects_found.len()).into());
-            console::log_1(&format!("vectors found: {:?}", objects_found.len() / 4).into());
             console::log_1(&format!("value at texture space coordinates: {:?}", objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize]).into());
-            console::log_1(&format!("objects found: {:?}", objects_found).into());
 
             // check what the user clicked
             // if the user clicked an object in the world, let's highglight it
@@ -149,7 +151,9 @@ struct MainGlowProgram {
     present_program: glow::Program,
     vertex_array: glow::VertexArray,
     current_texture_resolution: [i32; 2],
-    objects_found: Vec<u8>
+    objects_found: Vec<u8>,
+    desired_scaling_factor: f32,
+    currently_selected_object: usize
 }
 
 #[allow(unsafe_code)] // we need unsafe code to use glow
@@ -291,7 +295,9 @@ impl MainGlowProgram {
                 present_program: present_to_screen_program,
                 vertex_array,
                 current_texture_resolution: [0, 0],
-                objects_found: vec![0u8]
+                objects_found: vec![0u8],
+                desired_scaling_factor: 0.5,
+                currently_selected_object: 0
             })
         }
     }
@@ -308,7 +314,7 @@ impl MainGlowProgram {
     fn paint(&mut self, gl: &glow::Context, camera: Camera, window_rect: Rect, world: &World, time: f32) {
         use glow::HasContext as _;
 
-        let resolution_multiplier = 0.5;
+        let resolution_multiplier = self.desired_scaling_factor;
 
         unsafe {
             gl.use_program(Some(self.main_image_program));
@@ -381,6 +387,12 @@ impl MainGlowProgram {
                 &list
             );
 
+            gl.uniform_2_f32(
+                gl.get_uniform_location(self.main_image_program, "viewport_dimensions").as_ref(),
+                texture_resolution[0] as f32,
+                texture_resolution[0] as f32
+            );
+
             gl.clear_color(0.1, 0.1, 0.1, 1.0);
             gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
 
@@ -440,11 +452,14 @@ impl MainGlowProgram {
                 window_rect.height()
             );
 
+            console::log_1(&format!("{:?}", texture_resolution).into());
+
             gl.active_texture(glow::TEXTURE0);
             gl.bind_texture(glow::TEXTURE_2D, Some(color_buffer));
 
             gl.active_texture(glow::TEXTURE1);
             gl.bind_texture(glow::TEXTURE_2D, Some(object_found));
+
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
 
             // probably not the most efficient but oh well

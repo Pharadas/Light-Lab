@@ -6,6 +6,7 @@ uniform vec2 u_rotation;
 uniform vec3 position; 
 uniform uint objects[3000];
 uniform uint buckets[1000];
+// uniform vec2 viewport_dimensions;
 uniform float time;
 
 layout(location = 0) out vec4 out_color;
@@ -1234,7 +1235,7 @@ void main() {
   vec2 viewport_dimensions = vec2(750., 750.);
   vec2 screen_pos = ((gl_FragCoord.xy / viewport_dimensions) * 2.) - 1.;
 
-  vec3 camera_dir = vec3(0.0, 0.0, 0.9);
+  vec3 camera_dir = vec3(0.0, 0.0, 1.0);
   vec3 camera_plane_u = vec3(1.0, 0.0, 0.0);
   vec3 camera_plane_v = vec3(0.0, 1.0, 0.0);
 
