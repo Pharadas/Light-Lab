@@ -18,8 +18,9 @@ void main() {
   vec2 screen_pos = (gl_FragCoord.xy) / viewport_dimensions;
   vec3 rgb_object_found = texture(objects_found, screen_pos).rgb;
 
+  //                                   i kinda have to do this because the vector is normalized to 1 on every axis
   if ((selected_object != uint(0)) && (is_approx(float(selected_object), rgb_object_found.x * 255.0))) {
-    FragColor = vec4(1.);
+    FragColor = vec4(normalize(texture(screenTexture, screen_pos).rgb * 100.0), 1.);
 
   } else {
     FragColor = vec4(texture(screenTexture, screen_pos).rgb, 1.);

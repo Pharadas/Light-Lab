@@ -11,7 +11,7 @@ pub struct KeyValue {
 #[derive(Debug, Clone)]
 pub struct GPUHashTable {
     pub buckets: Vec<u32>,
-    objects: Vec<KeyValue>,
+    pub objects: Vec<KeyValue>,
     objects_left: Vec<usize>, // should probably be a linked list as it will be acting as a stack
     block_size: Vector<u32>,
 }

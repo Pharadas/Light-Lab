@@ -7,8 +7,9 @@ use eframe::{egui_glow, glow::HasContext};
 use egui::{color_picker::{color_picker_color32, Alpha}, epaint::color, mutex::Mutex, Color32, Rect, RichText, Widget, WidgetText};
 use egui_glow::glow;
 use web_sys::console;
+use std::mem::*;
 
-use crate::{camera::Camera, menus::{MenusState, OpticalObject}, rasterizer::World};
+use crate::{camera::Camera, menus::{MenusState, OpticalObject}, world::World};
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -388,6 +389,11 @@ impl MainGlowProgram {
                 gl.get_uniform_location(self.main_image_program, "viewport_dimensions").as_ref(),
                 texture_resolution[0] as f32,
                 texture_resolution[0] as f32
+            );
+
+            gl.uniform_1_u32_slice(
+                gl.get_uniform_location(self.main_image_program, "object_definitions").as_ref(),
+                world.get_gpu_compatible_world_objects_list().as_slice()
             );
 
             gl.clear_color(0.1, 0.1, 0.1, 1.0);

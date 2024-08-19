@@ -4,7 +4,7 @@ use math_vector::Vector;
 use egui_plot::{Line, Plot, PlotItem, PlotPoints};
 use web_sys::console;
 
-use crate::rasterizer::World;
+use crate::world::World;
 
 #[derive(PartialEq)]
 pub enum OpticalObject {

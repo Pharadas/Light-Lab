@@ -3,7 +3,7 @@
 mod app;
 mod gpu_hash;
 mod camera;
-mod rasterizer;
+mod world;
 mod menus;
 mod tests;
 

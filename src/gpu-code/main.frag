@@ -18,11 +18,59 @@ const ivec3 WORLD_SIZE = ivec3(200, 200, 200);
 const float PI = 3.1416;
 const uint U32_MAX = uint(4294967295);
 
+// WorldObject.type possible values
+const uint CUBE_WALL = uint(0);                   // Filled cube that can only be in uvec3 positions
+const uint SQUARE_WALL = uint(1);                 // Infinitesimally thin square wall
+const uint ROUND_WALL = uint(2);                  // Infinitesimally thin round wall
+const uint LIGHT_SOURCE = uint(3);                // Sphere that represents a light source
+const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using a jones matrix
+const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
+const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
+
 struct gsl_complex {
   float dat[2];
 };
 
+struct ComplexNumber {
+  vec2 dat;
+};
+
+// Complex matrix =
+// |a b|
+// |c d|
+struct Complex2x2Matrix {
+  ComplexNumber a;
+  ComplexNumber b;
+  ComplexNumber c;
+  ComplexNumber d;
+};
+
+struct Polarization {
+  ComplexNumber Ex;
+  ComplexNumber Ey;
+};
+
 // Struct definitions ====================================
+struct WorldObject {
+  uint type;
+  vec3 center;
+  // top_left and bottom_right will only be relevant if the object is a
+  // square of round wall
+  vec3 top_left;
+  vec3 bottom_right;
+  // Will only be relevant if the object is a round wall
+  // or a light source
+  // will be the radius of the sphere if it's a light source
+  // and the radius of the wall
+  float radius;
+  // Will only be relevant if it's a light source
+  Polarization polarization;
+  // Will only be relevant if it's an optical object
+  Complex2x2Matrix jones_matrix;
+};
+
+uniform WorldObject[116] objects_input;
+
 struct RayObject {
   // current direction of the ray
   vec3 dir;
@@ -1146,6 +1194,12 @@ vec3 quadIntersect( in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2, 
     return p + t*rd;
 }
 
+float computeDistance(vec3 A, vec3 B, vec3 C) {
+	float x = length(cross(B - A, C - A));
+	float y = length(B - A);
+	return x / y;
+}
+
 // Ray marching code
 void step_ray(inout RayObject ray) {
   ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
@@ -1177,7 +1231,7 @@ void iterateRayInDirection(inout RayObject ray) {
     // TEMPORAL check if it hits a random plane
     if (ray.map_pos == ivec3(49, 49, 51) &&
       (
-        length(quad_hit_position) < 0.2
+        computeDistance(ray.pos, ray.pos + ray.dir, vec3(49.5, 49.5, 51.5)) < 0.1
       )) {
       // ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       // ray.current_real_position = vec3(50.5, 50.8, 50.2) + quad_hit_position;
