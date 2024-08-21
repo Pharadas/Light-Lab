@@ -2,14 +2,18 @@
 
 use std::sync::Arc;
 
-use as_bytes::AsBytes;
 use eframe::{egui_glow, glow::HasContext};
-use egui::{color_picker::{color_picker_color32, Alpha}, epaint::color, mutex::Mutex, Color32, Rect, RichText, Widget, WidgetText};
+use egui::{color_picker::{color_picker_color32, Alpha}, epaint::color, mutex::Mutex, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
 use egui_glow::glow;
+use image::RgbaImage;
 use web_sys::console;
 use std::mem::*;
 
-use crate::{camera::Camera, menus::{MenusState, OpticalObject}, world::World};
+use crate::{camera::Camera, menus::MenusState, world::World};
+
+fn load_texture() {
+
+}
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -23,12 +27,58 @@ pub struct MainApp {
 impl MainApp {
     pub fn new<'a>(cc: &'a eframe::CreationContext<'a>) -> Option<Self> {
         let gl = cc.gl.as_ref()?;
+
+        // This is a terrible way of doing this but no image loader will interpret a single format so i
+        // guess this is what we are doing
+        let image_sizes: Vec<[usize; 2]> = vec![
+            // polarizers
+            [53, 37],
+            [53, 37],
+            [87, 37],
+            [185, 39],
+            [74, 37],
+            [74, 37],
+
+            // phase retarders
+            [82, 37],
+            [81, 37],
+            [262, 39],
+            [121, 37],
+            [233, 39],
+            [289, 45],
+            [336, 45],
+        ];
+
+        let all_images = vec![
+            RgbaImage::from_raw(image_sizes[0][0] as u32, image_sizes[0][1] as u32, include_bytes!("../assets/optical_objects_bytes/linear_horizontal_polarizer.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[1][0] as u32, image_sizes[1][1] as u32, include_bytes!("../assets/optical_objects_bytes/linear_vertical_polarizer.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[2][0] as u32, image_sizes[2][1] as u32, include_bytes!("../assets/optical_objects_bytes/linear_45_polarizer.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[3][0] as u32, image_sizes[3][1] as u32, include_bytes!("../assets/optical_objects_bytes/linear_theta_polarizer.bytes").to_vec()).unwrap(),
+
+            RgbaImage::from_raw(image_sizes[4][0] as u32, image_sizes[4][1] as u32, include_bytes!("../assets/optical_objects_bytes/right_circular_polarizer.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[5][0] as u32, image_sizes[5][1] as u32, include_bytes!("../assets/optical_objects_bytes/left_circular_polarizer.bytes").to_vec()).unwrap(),
+
+            RgbaImage::from_raw(image_sizes[6][0] as u32, image_sizes[6][1] as u32, include_bytes!("../assets/optical_objects_bytes/quarter_wave_vertical.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[7][0] as u32, image_sizes[7][1] as u32, include_bytes!("../assets/optical_objects_bytes/quarter_wave_horizontal.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[8][0] as u32, image_sizes[8][1] as u32, include_bytes!("../assets/optical_objects_bytes/quarter_wave_theta.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[9][0] as u32, image_sizes[9][1] as u32, include_bytes!("../assets/optical_objects_bytes/half_wave_theta.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[10][0] as u32, image_sizes[10][1] as u32, include_bytes!("../assets/optical_objects_bytes/half_wave_fast_horizontal_theta.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[11][0] as u32, image_sizes[11][1] as u32, include_bytes!("../assets/optical_objects_bytes/linear_phase_retarder_theta.bytes").to_vec()).unwrap(),
+            RgbaImage::from_raw(image_sizes[12][0] as u32, image_sizes[12][1] as u32, include_bytes!("../assets/optical_objects_bytes/elliptical_phase_retarder.bytes").to_vec()).unwrap(),
+        ];
+
+        let screen_texture = cc.egui_ctx.load_texture(
+            "screen",
+            ImageData::Color(Arc::new(ColorImage::new([320, 80], Color32::TRANSPARENT))),
+            TextureOptions::default(),
+        );
+
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
             world: World::new(),
             camera: Camera::new(),
             time: 0.0,
-            menus: MenusState::new()
+            menus: MenusState::new(screen_texture, all_images, image_sizes)
         })
     }
 }
@@ -84,7 +134,7 @@ impl eframe::App for MainApp {
     }
 
     fn on_exit(&mut self, gl: Option<&glow::Context>) {
-        if let Some(gl) = gl {
+if let Some(gl) = gl {
             self.glow_program.lock().destroy(gl);
         }
     }

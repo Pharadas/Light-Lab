@@ -21,9 +21,10 @@ fn main() -> eframe::Result {
     };
 
     eframe::run_native(
-        "eframe template",
+        "Light Lab",
         native_options,
-        Box::new(|cc| Ok(Box::new(light_lab::MainApp::new(cc).unwrap()))),
+        Box::new(|cc| Ok(Box::new(light_lab::MainApp::new(cc).unwrap()))
+        ),
     )
 }
 
@@ -40,7 +41,8 @@ fn main() {
             .start(
                 "the_canvas_id",
                 web_options,
-                Box::new(|cc| Ok(Box::new(light_lab::MainApp::new(cc).unwrap()))),
+                Box::new(|cc| Ok(Box::new(light_lab::MainApp::new(cc).unwrap()))
+                ),
             )
             .await;
 

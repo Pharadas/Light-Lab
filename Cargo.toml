@@ -27,6 +27,9 @@ math_vector = "0.2.1"
 egui_plot = "0.28.1"
 wasm-bindgen = "0.2"
 slice-of-array = "0.3.2"
+egui_extras = { version = "*", features = ["all_loaders"] }
+image = { version = "0.24", features = ["jpeg", "png"] } # Add the types you want support for
+nalgebra = "0.33.0"
 
 [dependencies.web-sys]
 version = "0.3"
@@ -34,14 +37,6 @@ features = [
   "Window",
   "console"
 ]
-
-# [dev-dependencies]
-# glow = "0.10.0"
-# glutin = "0.27.0"
-# imgui-glow-renderer = "0.8.3"
-# imgui-winit-support = "0.8.2"
-# imgui = "0.8.2"
-# rand = "0.8.4"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

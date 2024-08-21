@@ -113,10 +113,10 @@ impl GPUHashTable {
 
     // terrible stuff
     pub fn opengl_compatible_objects_list(&self, list_to_fill: &mut [u32]) {
-        for (i, key_val) in self.objects.iter().enumerate() {
-            list_to_fill[i * 3] = key_val.key;
-            list_to_fill[(i * 3) + 1] = key_val.value;
-            list_to_fill[(i * 3) + 2] = key_val.next;
+        for (i, val) in self.objects.iter().enumerate() {
+            list_to_fill[i * 3] = val.key;
+            list_to_fill[(i * 3) + 1] = val.value;
+            list_to_fill[(i * 3) + 2] = val.next;
         }
     }
 }
