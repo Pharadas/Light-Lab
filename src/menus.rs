@@ -40,6 +40,12 @@ impl MenusState {
         };
     }
 
+    pub fn debug_menu(&mut self, ui: &mut Ui, world: &mut World) {
+        if ui.add(Button::new("Print hashmap")).clicked() {
+            console::log_1(&format!("{:?}", world.hash_map).into());
+        }
+    }
+
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64) {
         let a_vertical = 0.01 * time;
 
@@ -47,7 +53,6 @@ impl MenusState {
             let x = i as f64 * 0.01;
             [x, (1.0 / a_vertical) * (a_vertical.powi(2) - x.powi(2)).sqrt()]
         }).collect();
-        let ellipse_top_half = Line::new(vertical_ellipse_top_half).color(Color32::from_rgb(255, 0, 0));
 
         // let vertical_ellipse_bottom_half: PlotPoints = (-100..=100).map(|i| {
         //     let x = i as f64 * 0.01;

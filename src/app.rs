@@ -107,25 +107,25 @@ impl eframe::App for MainApp {
                         // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
                     });
 
+                    egui::Window::new("Debug menu").show(ctx, |ui| {
+                        self.menus.debug_menu(ui, &mut self.world);
+                    });
+
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
                         if ui.input(|i| i.key_pressed(egui::Key::A)) {
                             self.camera.update(egui::Key::A);
-                            console::log_1(&"pressed A".into());
                         }
 
                         if ui.input(|i| i.key_pressed(egui::Key::D)) {
                             self.camera.update(egui::Key::D);
-                            console::log_1(&"pressed D".into());
                         }
 
                         if ui.input(|i| i.key_pressed(egui::Key::S)) {
                             self.camera.update(egui::Key::S);
-                            console::log_1(&"pressed S".into());
                         }
 
                         if ui.input(|i| i.key_pressed(egui::Key::W)) {
                             self.camera.update(egui::Key::W);
-                            console::log_1(&"pressed W".into());
                         }
                     });
 
@@ -511,7 +511,7 @@ impl MainGlowProgram {
                 self.currently_selected_object as u32
             );
 
-            console::log_1(&format!("{:?}", texture_resolution).into());
+            // console::log_1(&format!("{:?}", texture_resolution).into());
 
             gl.active_texture(glow::TEXTURE0);
             gl.bind_texture(glow::TEXTURE_2D, Some(color_buffer));
