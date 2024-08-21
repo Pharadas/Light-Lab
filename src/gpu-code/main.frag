@@ -1262,7 +1262,7 @@ void iterateRayInDirection(inout RayObject ray) {
 
     if (objects[current_index * uint(3)] == hashed_value) {
       ray.ended_in_hit = true;
-      ray.object_hit = current_index + uint(1);
+      ray.object_hit = objects[current_index * uint(3) + uint(1)]; // key.val
       return;
     }
 

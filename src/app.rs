@@ -2,18 +2,13 @@
 
 use std::sync::Arc;
 
-use eframe::{egui_glow, glow::HasContext};
-use egui::{color_picker::{color_picker_color32, Alpha}, epaint::color, mutex::Mutex, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
+use eframe::egui_glow;
+use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
 use egui_glow::glow;
 use image::RgbaImage;
 use web_sys::console;
-use std::mem::*;
 
 use crate::{camera::Camera, menus::MenusState, world::World};
-
-fn load_texture() {
-
-}
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -93,6 +88,16 @@ impl eframe::App for MainApp {
                     egui::Window::new("Main menu").show(ctx, |ui| {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"));
+
+                        if self.menus.should_display_debug_menu {
+                            if ui.add(Button::new("Hide debug menu")).clicked() {
+                                self.menus.should_display_debug_menu = false;
+                            }
+                        } else {
+                            if ui.add(Button::new("Display debug menu")).clicked() {
+                                self.menus.should_display_debug_menu = true;
+                            }
+                        }
                     });
 
                     if self.glow_program.lock().currently_selected_object != 0 {
@@ -107,9 +112,12 @@ impl eframe::App for MainApp {
                         // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
                     });
 
-                    egui::Window::new("Debug menu").show(ctx, |ui| {
-                        self.menus.debug_menu(ui, &mut self.world);
-                    });
+                    if self.menus.should_display_debug_menu {
+                        egui::Window::new("Debug menu").show(ctx, |ui| {
+                            self.menus.debug_menu(ui, &mut self.world, self.glow_program.lock().clone());
+                        });
+
+                    }
 
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
                         if ui.input(|i| i.key_pressed(egui::Key::A)) {
@@ -195,14 +203,15 @@ impl MainApp {
     }
 }
 
-struct MainGlowProgram {
-    main_image_program: glow::Program,
-    present_program: glow::Program,
-    vertex_array: glow::VertexArray,
-    current_texture_resolution: [i32; 2],
-    objects_found: Vec<u8>,
-    desired_scaling_factor: f32,
-    currently_selected_object: usize
+#[derive(Clone)]
+pub struct MainGlowProgram {
+    pub main_image_program: glow::Program,
+    pub present_program: glow::Program,
+    pub vertex_array: glow::VertexArray,
+    pub current_texture_resolution: [i32; 2],
+    pub objects_found: Vec<u8>,
+    pub desired_scaling_factor: f32,
+    pub currently_selected_object: usize
 }
 
 #[allow(unsafe_code)] // we need unsafe code to use glow

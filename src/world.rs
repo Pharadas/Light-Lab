@@ -317,32 +317,6 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Ve
 
 impl World {
     pub fn new() -> World {
-        // let sample_triangle = Triangle {
-        //     p0: Vector::new(5.3,   5.3, 5.3),
-        //     p1: Vector::new(-5.3,  5.3, -5.3),
-        //     p2: Vector::new(-5.3, -5.3, 5.3)
-        // };
-
-        // let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
-
-        // let a_through_b_rasterized = raymarch(to_f64_slice(sample_triangle.p0), to_f64_slice(sample_triangle.p1 - sample_triangle.p0), to_f64_slice(sample_triangle.p1), Max::Steps(50));
-
-        // console::log_1(&format!("final list: {:?}", a_through_b_rasterized).into());
-
-        // for position in a_through_b_rasterized {
-        //     gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
-        //     // now just keep firing rays to every position and rasterizing
-        //     let c_through_position_rasterized = raymarch(to_f64_slice(sample_triangle.p2), to_f64_slice(position.as_f32s() - sample_triangle.p2), to_f64_slice(position.as_f32s()), Max::Steps(50));
-        //     console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
-
-        //     // just put it into the grid
-        //     for new_position in c_through_position_rasterized {
-        //         gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
-        //     }
-        // }
-
-        // gpu_hash.insert(Vector::new(100u32, 100u32, 100u32), 1);
-
         return World {
             hash_map: GPUHashTable::new(Vector::new(200, 200, 200)),
             objects: vec![],

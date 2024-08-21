@@ -1,15 +1,12 @@
 use std::f32::consts::PI;
 
-use eframe::glow::Context;
-use egui::{self, epaint::image, include_image, Button, Color32, ColorImage, Image, ImageSource, Pos2, Response, RichText, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
-use ::image::{ImageBuffer, Rgba, RgbImage, RgbaImage};
+use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
+use ::image::{ImageBuffer, Rgba};
 use math_vector::Vector;
-use egui_plot::{Line, Plot, PlotItem, PlotPoints, PlotResponse};
-use nalgebra::ComplexField;
+use egui_plot::{Plot, PlotPoints};
 use web_sys::console;
-use egui_extras::{TableBuilder, Column, RetainedImage};
 
-use crate::world::{ObjectType, OpticalObject, PolarizerType, World, WorldObject};
+use crate::{app::MainGlowProgram, world::{ObjectType, OpticalObject, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
     selected_object: OpticalObject,
@@ -21,7 +18,28 @@ pub struct MenusState {
     object_creation_state: WorldObject,
     image_texture: TextureHandle,
     raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>,
-    image_sizes: Vec<[usize; 2]>
+    image_sizes: Vec<[usize; 2]>,
+    pub should_display_debug_menu: bool,
+    should_display_debug_objects_view: bool
+}
+
+// rand doesnt work good with wasm, so we will just generate them
+fn generate_colors_list() -> Vec<[u8; 4]> {
+    vec![
+        [0, 0, 0, 255],
+        [164,138,150, 255],
+        [9,62,36, 255],
+        [200,40,235, 255],
+        [52,112,129, 255],
+        [78,175,51, 255],
+        [53,138,30, 255],
+        [183,171,239, 255],
+        [2,67,188, 255],
+        [91,113,64, 255],
+        [235,39,232, 255],
+        [60,69,123, 255],
+        [200,40,235, 255],
+    ]
 }
 
 impl MenusState {
@@ -36,29 +54,54 @@ impl MenusState {
             object_creation_state: WorldObject::new(ObjectType::CubeWall),
             image_texture: texture,
             raw_images,
-            image_sizes
+            image_sizes,
+            should_display_debug_menu: false,
+            should_display_debug_objects_view: false
         };
     }
 
-    pub fn debug_menu(&mut self, ui: &mut Ui, world: &mut World) {
+    pub fn debug_menu(&mut self, ui: &mut Ui, world: &mut World, glow_program: MainGlowProgram) {
+        ui.add(Label::new(format!("{:?}", glow_program.current_texture_resolution)));
+
         if ui.add(Button::new("Print hashmap")).clicked() {
             console::log_1(&format!("{:?}", world.hash_map).into());
+        }
+
+        if self.should_display_debug_objects_view {
+            if ui.add(Button::new("Hide debug objects view")).clicked() {
+                self.should_display_debug_objects_view = false;
+            }
+
+        } else {
+            if ui.add(Button::new("Show debug objects view (WARNING, EXTREMELY SLOW)")).clicked() {
+                self.should_display_debug_objects_view = true;
+            }
+        }
+
+        if self.should_display_debug_objects_view {
+            let colors = generate_colors_list();
+            let objects_colored: Vec<u8> = glow_program.objects_found.chunks(4).flat_map(|x| colors[(x[0] % 13) as usize]).collect();
+
+            let curr_image = &objects_colored;
+
+            self.image_texture.set(
+                ColorImage::from_rgba_unmultiplied([
+                    glow_program.current_texture_resolution[0] as usize,
+                    glow_program.current_texture_resolution[1] as usize
+                ], &curr_image),
+                TextureOptions::default(),
+            );
+
+            ui.add(
+                egui::Image::new(&self.image_texture)
+                    .max_height(400.0)
+                    .max_width(500.0)
+            );
         }
     }
 
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64) {
         let a_vertical = 0.01 * time;
-
-        let vertical_ellipse_top_half: PlotPoints = (-100..=100).map(|i| {
-            let x = i as f64 * 0.01;
-            [x, (1.0 / a_vertical) * (a_vertical.powi(2) - x.powi(2)).sqrt()]
-        }).collect();
-
-        // let vertical_ellipse_bottom_half: PlotPoints = (-100..=100).map(|i| {
-        //     let x = i as f64 * 0.01;
-        //     [x,-(1.0 / a_vertical) * (a_vertical.powi(2) - x.powi(2)).sqrt()]
-        // }).collect();
-        // let ellipse_bottom_half = Line::new(vertical_ellipse_bottom_half).color(Color32::from_rgb(255, 0, 0));
 
         let mut shapes = vec![];
 
