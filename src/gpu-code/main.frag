@@ -19,7 +19,7 @@ const float PI = 3.1416;
 const uint U32_MAX = uint(4294967295);
 
 // WorldObject.type possible values
-const uint CUBE_WALL = uint(0);                   // Filled cube that can only be in uvec3 positions
+const uint CUBE = uint(0);                        // Filled cube that can only be in uvec3 positions
 const uint SQUARE_WALL = uint(1);                 // Infinitesimally thin square wall
 const uint ROUND_WALL = uint(2);                  // Infinitesimally thin round wall
 const uint LIGHT_SOURCE = uint(3);                // Sphere that represents a light source
@@ -69,7 +69,7 @@ struct WorldObject {
   Complex2x2Matrix jones_matrix;
 };
 
-uniform WorldObject[116] objects_input;
+uniform WorldObject objects_definitions[100];
 
 struct RayObject {
   // current direction of the ray
@@ -1231,7 +1231,7 @@ void iterateRayInDirection(inout RayObject ray) {
     // TEMPORAL check if it hits a random plane
     if (ray.map_pos == ivec3(49, 49, 51) &&
       (
-        computeDistance(ray.pos, ray.pos + ray.dir, vec3(49.5, 49.5, 51.5)) < 0.1
+        length(quad_hit_position) < 0.2
       )) {
       // ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       // ray.current_real_position = vec3(50.5, 50.8, 50.2) + quad_hit_position;

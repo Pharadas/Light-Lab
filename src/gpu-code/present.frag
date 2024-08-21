@@ -20,7 +20,7 @@ void main() {
 
   //                                   i kinda have to do this because the vector is normalized to 1 on every axis
   if ((selected_object != uint(0)) && (is_approx(float(selected_object), rgb_object_found.x * 255.0))) {
-    FragColor = vec4(normalize(texture(screenTexture, screen_pos).rgb * 100.0), 1.);
+    FragColor = vec4(normalize(texture(screenTexture, screen_pos).rgb), 1.);
 
   } else {
     FragColor = vec4(texture(screenTexture, screen_pos).rgb, 1.);

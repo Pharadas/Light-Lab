@@ -1,10 +1,11 @@
 use std::f32::consts::PI;
 
 use eframe::glow::Context;
-use egui::{self, epaint::image, include_image, Button, Color32, ColorImage, Image, ImageSource, RichText, Slider, TextureHandle, TextureOptions, Ui};
+use egui::{self, epaint::image, include_image, Button, Color32, ColorImage, Image, ImageSource, Pos2, Response, RichText, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use ::image::{ImageBuffer, Rgba, RgbImage, RgbaImage};
 use math_vector::Vector;
-use egui_plot::{Line, Plot, PlotItem, PlotPoints};
+use egui_plot::{Line, Plot, PlotItem, PlotPoints, PlotResponse};
+use nalgebra::ComplexField;
 use web_sys::console;
 use egui_extras::{TableBuilder, Column, RetainedImage};
 
@@ -13,6 +14,7 @@ use crate::world::{ObjectType, OpticalObject, PolarizerType, World, WorldObject}
 pub struct MenusState {
     selected_object: OpticalObject,
     selected_polarizer_type: PolarizerType,
+    rotation: Vec2,
     angle: f32,
     relative_phase_retardation: f32,
     circularity: f32,
@@ -27,6 +29,7 @@ impl MenusState {
         return MenusState {
             selected_object: OpticalObject::LightSource,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
+            rotation: Vec2::new(150.0, 150.0),
             angle: 0f32,
             relative_phase_retardation: 0f32,
             circularity: 0f32,
@@ -37,24 +40,53 @@ impl MenusState {
         };
     }
 
-    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World) {
-        let sin: PlotPoints = (-100..100).map(|i| {
-            let x = i as f64 * 0.01;
-            [x, x.sin()]
-        }).collect();
-        let line = Line::new(sin).color(Color32::from_rgb(255, 0, 0));
+    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64) {
+        let a_vertical = 0.01 * time;
 
-        let neg_sin: PlotPoints = (-100..100).map(|i| {
+        let vertical_ellipse_top_half: PlotPoints = (-100..=100).map(|i| {
             let x = i as f64 * 0.01;
-            [x, -x.sin()]
+            [x, (1.0 / a_vertical) * (a_vertical.powi(2) - x.powi(2)).sqrt()]
         }).collect();
-        let neg_line = Line::new(neg_sin).color(Color32::from_rgb(255, 0, 0));
+        let ellipse_top_half = Line::new(vertical_ellipse_top_half).color(Color32::from_rgb(255, 0, 0));
 
-        Plot::new("my_plot").allow_drag(false).allow_boxed_zoom(false).allow_zoom(false).view_aspect(2.0).show(ui, |plot_ui| {
-            console::log_1(&format!("{:?}", plot_ui.pointer_coordinate_drag_delta()).into());
-            plot_ui.line(line);
-            plot_ui.line(neg_line);
-        });
+        // let vertical_ellipse_bottom_half: PlotPoints = (-100..=100).map(|i| {
+        //     let x = i as f64 * 0.01;
+        //     [x,-(1.0 / a_vertical) * (a_vertical.powi(2) - x.powi(2)).sqrt()]
+        // }).collect();
+        // let ellipse_bottom_half = Line::new(vertical_ellipse_bottom_half).color(Color32::from_rgb(255, 0, 0));
+
+        let mut shapes = vec![];
+
+        ui.add(Slider::new(&mut self.rotation.x, -150.0..=150.0).text("X rotation"));
+        ui.add(Slider::new(&mut self.rotation.y, -150.0..=150.0).text("Y rotation"));
+
+        let response = Plot::new("my_plot")
+        .allow_drag(false)
+        .allow_boxed_zoom(false)
+        .allow_zoom(false)
+        .include_x(1.0)
+        .include_y(1.0)
+        .include_x(-1.0)
+        .include_y(-1.0)
+        .view_aspect(1.0)
+        .show(ui, |plot_ui| {
+            // vertical
+            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(1.0, 150.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(self.rotation.x.abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
+
+            // horizontal
+            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, 1.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, self.rotation.y.abs()), Stroke::new(1.0, Color32::GREEN)));
+
+            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), self.rotation.abs(), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
+
+            self.rotation += plot_ui.pointer_coordinate_drag_delta() * 20.0;
+            // console::log_1(&format!("{:?}", plot_ui.pointer_coordinate_drag_delta()).into());
+            // plot_ui.line(ellipse_top_half);
+            // plot_ui.line(ellipse_bottom_half);
+        }).response;
+
+        ui.painter().with_clip_rect(response.rect).extend(shapes);
     }
 
     pub fn select_object_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {
@@ -100,10 +132,10 @@ impl MenusState {
                     }
                 );
 
-                let curr_image = self.raw_images[self.selected_polarizer_type as usize].clone();
+                let curr_image = &self.raw_images[self.selected_polarizer_type as usize];
 
                 self.image_texture.set(
-                    ColorImage::from_rgba_unmultiplied(self.image_sizes[self.selected_polarizer_type as usize], &curr_image.into_raw()),
+                    ColorImage::from_rgba_unmultiplied(self.image_sizes[self.selected_polarizer_type as usize], &curr_image),
                     TextureOptions::default(),
                 );
 
@@ -131,12 +163,14 @@ impl MenusState {
                     _ => {}
                 }
 
+                ui.add_space(10.0);
+
                 ui.add(
                     egui::Image::new(&self.image_texture)
                         .max_height(400.0)
                         .max_width(500.0)
-                        .fit_to_exact_size(egui::Vec2 { x: 500.0, y: 500.0 })
-                        .maintain_aspect_ratio(true)
+                        // .fit_to_exact_size(egui::Vec2 { x: 500.0, y: 500.0 })
+                        // .maintain_aspect_ratio(true)
                 );
 
                 ui.add_space(10.0);

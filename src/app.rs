@@ -32,21 +32,21 @@ impl MainApp {
         // guess this is what we are doing
         let image_sizes: Vec<[usize; 2]> = vec![
             // polarizers
-            [53, 37],
-            [53, 37],
-            [87, 37],
-            [185, 39],
-            [74, 37],
-            [74, 37],
+            [1000, 711],
+            [1000, 711],
+            [1000, 408],
+            [1000, 203],
+            [1000, 485],
+            [1000, 485],
 
             // phase retarders
-            [82, 37],
-            [81, 37],
-            [262, 39],
-            [121, 37],
-            [233, 39],
-            [289, 45],
-            [336, 45],
+            [1000, 428],
+            [1000, 433],
+            [1000, 142],
+            [1000, 290],
+            [1000, 150],
+            [1000, 146],
+            [1000, 126],
         ];
 
         let all_images = vec![
@@ -86,6 +86,7 @@ impl MainApp {
 impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            ctx.request_repaint();
             egui::ScrollArea::both()
                 .auto_shrink(false)
                 .show(ui, |ui| {
@@ -96,7 +97,7 @@ impl eframe::App for MainApp {
 
                     if self.glow_program.lock().currently_selected_object != 0 {
                         egui::Window::new("Object inspector").show(ctx, |ui| {
-                            self.menus.inspect_object_menu(ui, &mut self.world);
+                            self.menus.inspect_object_menu(ui, &mut self.world, self.time);
                             // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
                         });
                     }
@@ -442,7 +443,7 @@ impl MainGlowProgram {
             );
 
             gl.uniform_1_u32_slice(
-                gl.get_uniform_location(self.main_image_program, "object_definitions").as_ref(),
+                gl.get_uniform_location(self.main_image_program, "objects_definitions").as_ref(),
                 world.get_gpu_compatible_world_objects_list().as_slice()
             );
 
