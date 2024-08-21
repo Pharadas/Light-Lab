@@ -58,11 +58,11 @@ impl MenusState {
     }
 
     pub fn select_object_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {
-        egui::ComboBox::from_label("Optical object type")
+        egui::ComboBox::from_label("Polarizer/Phase retarder")
             .selected_text(format!("{}", self.selected_object))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut self.selected_object, OpticalObject::LightSource, "Light source");
-                ui.selectable_value(&mut self.selected_object, OpticalObject::Polarizer, "Polarizer");
+                ui.selectable_value(&mut self.selected_object, OpticalObject::Polarizer_PhaseRetarder, "Polarizer/Phase retarder");
                 ui.selectable_value(&mut self.selected_object, OpticalObject::Wall, "Wall");
             }
         );
@@ -74,8 +74,8 @@ impl MenusState {
                 // Polarization, color
             }
 
-            OpticalObject::Polarizer => {
-                egui::ComboBox::from_label("Polarize type")
+            OpticalObject::Polarizer_PhaseRetarder => {
+                egui::ComboBox::from_label("Type of polarizer/phase retarder")
                     .selected_text(format!("{}", self.selected_polarizer_type))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.selected_polarizer_type, PolarizerType::LinearHorizontal, "Linear horizontal");

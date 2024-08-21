@@ -21,7 +21,7 @@ pub enum ObjectType {
 #[derive(PartialEq)]
 pub enum OpticalObject {
     LightSource,
-    Polarizer,
+    Polarizer_PhaseRetarder,
     Mirror,
     BeamSplitter,
     Wall
@@ -32,7 +32,7 @@ impl Display for OpticalObject {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::LightSource => write!(f, "Light source"),
-            Self::Polarizer => write!(f, "Polarizer"),
+            Self::Polarizer_PhaseRetarder => write!(f, "Polarizer"),
             Self::Mirror => write!(f, "Mirror"),
             Self::BeamSplitter => write!(f, "Beam splitter"),
             Self::Wall => write!(f, "Wall"),
