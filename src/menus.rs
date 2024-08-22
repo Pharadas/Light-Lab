@@ -80,7 +80,7 @@ impl MenusState {
 
         if self.should_display_debug_objects_view {
             let colors = generate_colors_list();
-            let objects_colored: Vec<u8> = glow_program.objects_found.chunks(4).flat_map(|x| colors[(x[0] % 13) as usize]).collect();
+            let objects_colored: Vec<u8> = glow_program.objects_found.chunks(4).flat_map(|x| colors[(x[0] % 12) as usize]).rev().collect();
 
             let curr_image = &objects_colored;
 

@@ -81,7 +81,7 @@ impl MainApp {
 impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ctx.request_repaint();
+            ctx.request_repaint_after_secs(0.033);
             egui::ScrollArea::both()
                 .auto_shrink(false)
                 .show(ui, |ui| {
