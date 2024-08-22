@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::gpu_hash::GPUHashTable;
 
 // WorldObject.type possible values
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum ObjectType {
     CubeWall = 0,                   // Filled cube that can only be in uvec3 positions
     SquareWall = 1,                 // Infinitesimally thin square wall
@@ -18,24 +18,17 @@ pub enum ObjectType {
     OpticalObjectRoundWall = 6,     // An object represented using a jones matrix
 }
 
-#[derive(PartialEq)]
-pub enum OpticalObject {
-    LightSource,
-    Polarizer_PhaseRetarder,
-    Mirror,
-    BeamSplitter,
-    Wall
-}
-
 // Needed for the drop down list
-impl Display for OpticalObject {
+impl Display for ObjectType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LightSource => write!(f, "Light source"),
-            Self::Polarizer_PhaseRetarder => write!(f, "Polarizer"),
-            Self::Mirror => write!(f, "Mirror"),
-            Self::BeamSplitter => write!(f, "Beam splitter"),
-            Self::Wall => write!(f, "Wall"),
+            Self::CubeWall => write!(f, "Wall (cube)"),
+            Self::SquareWall => write!(f, "Wall (square)"),
+            Self::RoundWall => write!(f, "Wall (round)"),
+            Self::LightSource => write!(f, "Light source (sphere)"),
+            Self::OpticalObjectCube => write!(f, "Optical object (cube)"),
+            Self::OpticalObjectSquareWall => write!(f, "Optical object (square)"),
+            Self::OpticalObjectRoundWall  => write!(f, "Optical object (round)"),
         }
     }
 }
@@ -121,7 +114,8 @@ pub struct WorldObject {
     // would use an enum but i want to keep compatibility
     // with the gpu version of this struct
     // would have written 'type' but it's a reserved keyword
-    object_type: ObjectType,
+    pub object_type: ObjectType,
+    pub rotation: [f32; 2],
     center: [f32; 3],
     top_left: [f32; 3],
     bottom_right: [f32; 3],
@@ -317,6 +311,32 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Ve
 
 impl World {
     pub fn new() -> World {
+        // let sample_triangle = Triangle {
+        //     p0: Vector::new(5.3,   5.3, 5.3),
+        //     p1: Vector::new(-5.3,  5.3, -5.3),
+        //     p2: Vector::new(-5.3, -5.3, 5.3)
+        // };
+
+        // let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
+
+        // let a_through_b_rasterized = raymarch(to_f64_slice(sample_triangle.p0), to_f64_slice(sample_triangle.p1 - sample_triangle.p0), to_f64_slice(sample_triangle.p1), Max::Steps(50));
+
+        // console::log_1(&format!("final list: {:?}", a_through_b_rasterized).into());
+
+        // for position in a_through_b_rasterized {
+        //     gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
+        //     // now just keep firing rays to every position and rasterizing
+        //     let c_through_position_rasterized = raymarch(to_f64_slice(sample_triangle.p2), to_f64_slice(position.as_f32s() - sample_triangle.p2), to_f64_slice(position.as_f32s()), Max::Steps(50));
+        //     console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
+
+        //     // just put it into the grid
+        //     for new_position in c_through_position_rasterized {
+        //         gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
+        //     }
+        // }
+
+        // gpu_hash.insert(Vector::new(100u32, 100u32, 100u32), 1);
+
         return World {
             hash_map: GPUHashTable::new(Vector::new(200, 200, 200)),
             objects: vec![],
@@ -324,7 +344,7 @@ impl World {
     }
 
     pub fn insert_object(&mut self, position: Vector<i32>, object_definition: WorldObject) {
-        self.hash_map.insert((position + Vector::new(100, 100, 100)).as_u32s(), self.objects.len() as u32);
+        self.hash_map.insert((position + Vector::new(100, 100, 100)).as_u32s(), self.objects.len() as u32 + 1);
         self.objects.push(object_definition);
     }
 
@@ -377,6 +397,7 @@ impl WorldObject {
     pub fn new(object_type: ObjectType) -> WorldObject {
         return WorldObject {
             object_type: ObjectType::CubeWall,
+            rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
             top_left: [0.0, 0.0, 0.0],

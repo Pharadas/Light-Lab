@@ -6,10 +6,10 @@ use math_vector::Vector;
 use egui_plot::{Plot, PlotPoints};
 use web_sys::console;
 
-use crate::{app::MainGlowProgram, world::{ObjectType, OpticalObject, PolarizerType, World, WorldObject}};
+use crate::{app::MainGlowProgram, world::{ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
-    selected_object: OpticalObject,
+    selected_object: Option<WorldObject>,
     selected_polarizer_type: PolarizerType,
     rotation: Vec2,
     angle: f32,
@@ -45,7 +45,7 @@ fn generate_colors_list() -> Vec<[u8; 4]> {
 impl MenusState {
     pub fn new(texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
-            selected_object: OpticalObject::LightSource,
+            selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
             rotation: Vec2::new(150.0, 150.0),
             angle: 0f32,
@@ -101,7 +101,10 @@ impl MenusState {
     }
 
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64) {
-        let a_vertical = 0.01 * time;
+        ui.add(Label::new(format!("{:?}", self.object_creation_state.object_type)));
+
+        // load object data
+
 
         let mut shapes = vec![];
 
@@ -137,24 +140,33 @@ impl MenusState {
         ui.painter().with_clip_rect(response.rect).extend(shapes);
     }
 
-    pub fn select_object_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {
+    pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {
         egui::ComboBox::from_label("Polarizer/Phase retarder")
-            .selected_text(format!("{}", self.selected_object))
+            .selected_text(format!("{}", self.object_creation_state.object_type))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.selected_object, OpticalObject::LightSource, "Light source");
-                ui.selectable_value(&mut self.selected_object, OpticalObject::Polarizer_PhaseRetarder, "Polarizer/Phase retarder");
-                ui.selectable_value(&mut self.selected_object, OpticalObject::Wall, "Wall");
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::CubeWall, "Wall (cube)");
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::SquareWall, "Wall (square)");
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::RoundWall, "Wall (round)");
+
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::LightSource, "Light source (sphere)");
+
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectCube, "Optical object (cube)");
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectSquareWall, "Optical object (square)");
+                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectRoundWall, "Optical object (round)");
             }
         );
 
         ui.add_space(10.0);
 
-        match self.selected_object {
-            OpticalObject::LightSource => {
+        match self.object_creation_state.object_type {
+            ObjectType::LightSource => {
                 // Polarization, color
             }
 
-            OpticalObject::Polarizer_PhaseRetarder => {
+            ObjectType::OpticalObjectCube       |
+            ObjectType::OpticalObjectRoundWall  |
+            ObjectType::OpticalObjectSquareWall
+                => {
                 egui::ComboBox::from_label("Type of polarizer/phase retarder")
                     .selected_text(format!("{}", self.selected_polarizer_type))
                     .show_ui(ui, |ui| {
@@ -224,7 +236,10 @@ impl MenusState {
                 ui.add_space(10.0);
             }
 
-            OpticalObject::Wall => {
+            ObjectType::CubeWall   |
+            ObjectType::RoundWall  |
+            ObjectType::SquareWall
+                => {
                 // position, color
             }
 
