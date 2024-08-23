@@ -17,6 +17,7 @@ pub struct MenusState {
     circularity: f32,
     object_creation_state: WorldObject,
     image_texture: TextureHandle,
+    debug_texture: TextureHandle,
     raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>,
     image_sizes: Vec<[usize; 2]>,
     pub should_display_debug_menu: bool,
@@ -43,7 +44,7 @@ fn generate_colors_list() -> Vec<[u8; 4]> {
 }
 
 impl MenusState {
-    pub fn new(texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
+    pub fn new(image_texture: TextureHandle, debug_texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
             selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
@@ -52,7 +53,8 @@ impl MenusState {
             relative_phase_retardation: 0f32,
             circularity: 0f32,
             object_creation_state: WorldObject::new(ObjectType::CubeWall),
-            image_texture: texture,
+            image_texture,
+            debug_texture,
             raw_images,
             image_sizes,
             should_display_debug_menu: false,
@@ -66,6 +68,8 @@ impl MenusState {
         if ui.add(Button::new("Print hashmap")).clicked() {
             console::log_1(&format!("{:?}", world.hash_map).into());
         }
+
+        // ui.add(Label::new(format!()))
 
         if self.should_display_debug_objects_view {
             if ui.add(Button::new("Hide debug objects view")).clicked() {
@@ -84,7 +88,7 @@ impl MenusState {
 
             let curr_image = &objects_colored;
 
-            self.image_texture.set(
+            self.debug_texture.set(
                 ColorImage::from_rgba_unmultiplied([
                     glow_program.current_texture_resolution[0] as usize,
                     glow_program.current_texture_resolution[1] as usize
@@ -93,7 +97,7 @@ impl MenusState {
             );
 
             ui.add(
-                egui::Image::new(&self.image_texture)
+                egui::Image::new(&self.debug_texture)
                     .max_height(400.0)
                     .max_width(500.0)
             );

@@ -68,12 +68,18 @@ impl MainApp {
             TextureOptions::default(),
         );
 
+        let debug_texture = cc.egui_ctx.load_texture(
+            "screen",
+            ImageData::Color(Arc::new(ColorImage::new([320, 80], Color32::TRANSPARENT))),
+            TextureOptions::default(),
+        );
+
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
             world: World::new(),
             camera: Camera::new(),
             time: 0.0,
-            menus: MenusState::new(screen_texture, all_images, image_sizes)
+            menus: MenusState::new(screen_texture, debug_texture, all_images, image_sizes)
         })
     }
 }
