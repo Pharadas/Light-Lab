@@ -377,11 +377,6 @@ impl MainGlowProgram {
         unsafe {
             gl.use_program(Some(self.main_image_program));
 
-            // let objects_buffer = gl.create_buffer().unwrap();
-            // gl.bind_buffer(glow::SHADER_STORAGE_BUFFER, Some(objects_buffer));
-            // gl.buffer_data_u8_slice(glow::SHADER_STORAGE_BUFFER, [1u32].as_bytes(), glow::DYNAMIC_READ);
-            // gl.bind_buffer_base(glow::SHADER_STORAGE_BUFFER, 2, Some(objects_buffer));
-
             let texture_resolution = [(window_rect.width() * resolution_multiplier) as i32, (window_rect.height() * resolution_multiplier) as i32];
 
             self.current_texture_resolution = texture_resolution;
@@ -414,9 +409,6 @@ impl MainGlowProgram {
                 camera.look_direction.y
             );
 
-            // console::log_1(&format!("camera position {:?}", camera.position).into());
-            // console::log_1(&format!("camera rotation {:?}", camera.look_direction).into());
-
             gl.uniform_3_f32(
                 gl.get_uniform_location(self.main_image_program, "position").as_ref(),
                 camera.position.x, 
@@ -426,9 +418,6 @@ impl MainGlowProgram {
 
             let mut list = [0u32; 3000];
             world.hash_map.opengl_compatible_objects_list(&mut list);
-
-            // console::log_1(&format!("{:?}", list).into());
-            // console::log_1(&format!("{:?}", world.hash_map.buckets).into());
 
             gl.uniform_1_f32(
                 gl.get_uniform_location(self.main_image_program, "time").as_ref(),
