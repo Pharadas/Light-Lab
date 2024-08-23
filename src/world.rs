@@ -1,5 +1,5 @@
 use std::{f32::consts::PI, fmt::{self, Display, Formatter}};
-use nalgebra::{Complex, Matrix2};
+use nalgebra::{Complex, ComplexField, Matrix2, SimdValue};
 use web_sys::console;
 use math_vector::Vector;
 use serde::{Deserialize, Serialize};
@@ -90,38 +90,22 @@ struct Triangle {
     p2: Vector<f32>
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-struct ComplexNumber {
-    dat: [f32; 2]
+#[derive(Debug, Clone, Copy)]
+pub struct Polarization {
+    ex: Complex<f32>,
+    ey: Complex<f32>
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-struct Complex2x2Matrix {
-    a: ComplexNumber,
-    b: ComplexNumber,
-    c: ComplexNumber,
-    d: ComplexNumber
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-struct Polarization {
-    ex: ComplexNumber,
-    ey: ComplexNumber
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct WorldObject {
-    // would use an enum but i want to keep compatibility
-    // with the gpu version of this struct
-    // would have written 'type' but it's a reserved keyword
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
     center: [f32; 3],
     top_left: [f32; 3],
     bottom_right: [f32; 3],
     radius: f32,
-    polarization: Polarization,
-    jones_matrix: Complex2x2Matrix
+    pub polarization: Polarization,
+    pub jones_matrix: Matrix2<Complex<f32>>
 }
 
 #[derive(Copy, Clone)]
@@ -134,114 +118,6 @@ enum Max {
 pub struct World {
     pub hash_map: GPUHashTable,
     objects: Vec<WorldObject>,
-}
-
-pub fn calculate_matrix(type_of_object: PolarizerType, angle: f32, relative_phase_retardation: f32, circularity: f32) -> Matrix2<Complex<f32>> {
-    match type_of_object {
-        PolarizerType::LinearHorizontal => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
-                Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)
-            )
-        }
-
-        PolarizerType::LinearVertical => {
-            Matrix2::new(
-                Complex::new(0.0, 0.0), Complex::new(0.0, 0.0),
-                Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)
-            )
-        }
-
-        PolarizerType::Linear45Degrees => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
-                Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)
-            ).map(|x| x * 0.5)
-        }
-
-        PolarizerType::LinearTheta => {
-            Matrix2::new(
-                Complex::new(angle.cos().powi(2), 0.0),       Complex::new(angle.cos() * angle.sin(), 0.0),
-                Complex::new(angle.cos() * angle.sin(), 0.0), Complex::new(angle.sin().powi(2), 0.0)
-            )
-        }
-
-        PolarizerType::RightCircular => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0, 1.0),
-                Complex::new(0.0,-1.0), Complex::new(1.0, 0.0)
-            ).map(|x| x * 0.5)
-        }
-
-        PolarizerType::LeftCircular => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0,-1.0),
-                Complex::new(0.0, 1.0), Complex::new(1.0, 0.0)
-            ).map(|x| x * 0.5)
-        }
-
-        PolarizerType::QuarterWavePlateFastAxisVertical => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
-                Complex::new(0.0, 0.0), Complex::new(0.0,-1.0)
-            ).map(|x| x * Complex::new(0.0, PI / 4.0).exp())
-        }
-
-        PolarizerType::QuarterWavePlateFastAxisHorizontal => {
-            Matrix2::new(
-                Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
-                Complex::new(0.0, 0.0), Complex::new(0.0, 1.0)
-            ).map(|x| x * Complex::new(0.0, -PI / 4.0).exp())
-        }
-
-        PolarizerType::QuarterWavePlateFastAxisTheta => {
-            Matrix2::new(
-                Complex::new(angle.cos().powi(2), angle.sin().powi(2)),  (1f32 - Complex::new(0f32, -1f32)) * angle.sin() * angle.cos(),
-                (1f32 - Complex::new(0f32, -1f32)) * angle.sin() * angle.cos(), Complex::new(angle.sin().powi(2), angle.cos().powi(2))
-            ).map(|x| x * Complex::new(0.0, -PI / 4.0).exp())
-        }
-
-        PolarizerType::HalfWavePlateRotatedTheta => {
-            Matrix2::new(
-                Complex::new((2.0 * angle).cos(), 0.0), Complex::new( (2.0 * angle).sin(), 1.0),
-                Complex::new((2.0 * angle).sin(), 1.0), Complex::new(-(2.0 * angle).cos(), 0.0)
-            ).map(|x| x * 0.5)
-        }
-
-        PolarizerType::HalfWavePlateFastAxisTheta => {
-            Matrix2::new(
-                Complex::new(angle.cos().powi(2) - angle.sin().powi(2), 0.0), Complex::new(2.0 * angle.cos() * angle.sin(), 0.0),
-                Complex::new(2.0 * angle.cos() * angle.sin(), 0.0),           Complex::new(angle.sin().powi(2) - angle.cos().powi(2), 0.0)
-            ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
-        }
-
-        // god had no hand in creating these next 2
-        PolarizerType::GeneralWavePlateLinearRetarderTheta => {
-            let e_to_the_in = Complex::new(0.0, relative_phase_retardation).exp();
-
-            Matrix2::new(
-                angle.cos().powi(2)         + (e_to_the_in * angle.sin().powi(2)),
-                (angle.cos() * angle.sin()) - (e_to_the_in * angle.cos() * angle.sin()),
-
-                (angle.cos() * angle.sin()) - (e_to_the_in * angle.cos() * angle.sin()),
-                angle.sin().powi(2)         + (e_to_the_in * angle.cos().powi(2)),
-            ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
-        }
-
-        PolarizerType::ArbitraryBirefringentMaterialTheta => {
-            let e_to_the_in   =      Complex::new(0.0, relative_phase_retardation).exp();
-            let e_to_the_i_neg_phi = Complex::new(0.0,-circularity).exp();
-            let e_to_the_i_phi =     Complex::new(0.0, circularity).exp();
-
-            Matrix2::new(
-                 angle.cos().powi(2)                             + (e_to_the_in * angle.sin().powi(2)),
-                (e_to_the_i_neg_phi * angle.cos() * angle.sin()) - (e_to_the_in * e_to_the_i_neg_phi * angle.cos() * angle.sin()),
-
-                (e_to_the_i_phi * angle.cos() * angle.sin()) - (e_to_the_in * e_to_the_i_phi * angle.cos() * angle.sin()),
-                 angle.sin().powi(2)          + (e_to_the_in * angle.cos().powi(2)),
-            ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
-        }
-    }
 }
 
 fn to_f64_slice(a: Vector<f32>) -> [f64; 3] {
@@ -371,23 +247,23 @@ impl World {
 
                 object.radius.to_bits(),
 
-                object.polarization.ex.dat[0].to_bits(),
-                object.polarization.ex.dat[1].to_bits(),
+                object.polarization.ex.real().to_bits(),
+                object.polarization.ex.imaginary().to_bits(),
 
-                object.polarization.ey.dat[0].to_bits(),
-                object.polarization.ey.dat[1].to_bits(),
+                object.polarization.ey.real().to_bits(),
+                object.polarization.ey.imaginary().to_bits(),
 
-                object.jones_matrix.a.dat[0].to_bits(),
-                object.jones_matrix.a.dat[1].to_bits(),
+                object.jones_matrix[0].real().to_bits(),
+                object.jones_matrix[0].imaginary().to_bits(),
 
-                object.jones_matrix.b.dat[0].to_bits(),
-                object.jones_matrix.b.dat[1].to_bits(),
+                object.jones_matrix[1].real().to_bits(),
+                object.jones_matrix[1].imaginary().to_bits(),
 
-                object.jones_matrix.c.dat[0].to_bits(),
-                object.jones_matrix.c.dat[1].to_bits(),
+                object.jones_matrix[2].real().to_bits(),
+                object.jones_matrix[2].imaginary().to_bits(),
 
-                object.jones_matrix.d.dat[0].to_bits(),
-                object.jones_matrix.d.dat[1].to_bits(),
+                object.jones_matrix[3].real().to_bits(),
+                object.jones_matrix[3].imaginary().to_bits(),
             ]
         }).collect()
     }
@@ -406,15 +282,118 @@ impl WorldObject {
             radius: 0.0,
 
             polarization: Polarization {
-                ex: ComplexNumber { dat: [0.0, 0.0] }, 
-                ey: ComplexNumber { dat: [0.0, 0.0] }
+                ex: Complex::new(0.0, 0.0),
+                ey: Complex::new(0.0, 0.0)
             },
 
-            jones_matrix: Complex2x2Matrix {
-                a: ComplexNumber { dat: [0.0, 0.0] }, 
-                b: ComplexNumber { dat: [0.0, 0.0] }, 
-                c: ComplexNumber { dat: [0.0, 0.0] }, 
-                d: ComplexNumber { dat: [0.0, 0.0] }
+            jones_matrix: Matrix2::zeros()
+        }
+    }
+
+    pub fn set_jones_matrix(&mut self, type_of_object: PolarizerType, angle: f32, relative_phase_retardation: f32, circularity: f32) {
+        match type_of_object {
+            PolarizerType::LinearHorizontal => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)
+                )
+            }
+
+            PolarizerType::LinearVertical => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 0.0),
+                    Complex::new(0.0, 0.0), Complex::new(1.0, 0.0)
+                )
+            }
+
+            PolarizerType::Linear45Degrees => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)
+                ).map(|x| x * 0.5)
+            }
+
+            PolarizerType::LinearTheta => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(angle.cos().powi(2), 0.0),       Complex::new(angle.cos() * angle.sin(), 0.0),
+                    Complex::new(angle.cos() * angle.sin(), 0.0), Complex::new(angle.sin().powi(2), 0.0)
+                )
+            }
+
+            PolarizerType::RightCircular => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 1.0),
+                    Complex::new(0.0,-1.0), Complex::new(1.0, 0.0)
+                ).map(|x| x * 0.5)
+            }
+
+            PolarizerType::LeftCircular => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0,-1.0),
+                    Complex::new(0.0, 1.0), Complex::new(1.0, 0.0)
+                ).map(|x| x * 0.5)
+            }
+
+            PolarizerType::QuarterWavePlateFastAxisVertical => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
+                    Complex::new(0.0, 0.0), Complex::new(0.0,-1.0)
+                ).map(|x| x * Complex::new(0.0, PI / 4.0).exp())
+            }
+
+            PolarizerType::QuarterWavePlateFastAxisHorizontal => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(1.0, 0.0), Complex::new(0.0, 0.0),
+                    Complex::new(0.0, 0.0), Complex::new(0.0, 1.0)
+                ).map(|x| x * Complex::new(0.0, -PI / 4.0).exp())
+            }
+
+            PolarizerType::QuarterWavePlateFastAxisTheta => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(angle.cos().powi(2), angle.sin().powi(2)),  (1f32 - Complex::new(0f32, -1f32)) * angle.sin() * angle.cos(),
+                    (1f32 - Complex::new(0f32, -1f32)) * angle.sin() * angle.cos(), Complex::new(angle.sin().powi(2), angle.cos().powi(2))
+                ).map(|x| x * Complex::new(0.0, -PI / 4.0).exp())
+            }
+
+            PolarizerType::HalfWavePlateRotatedTheta => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new((2.0 * angle).cos(), 0.0), Complex::new( (2.0 * angle).sin(), 1.0),
+                    Complex::new((2.0 * angle).sin(), 1.0), Complex::new(-(2.0 * angle).cos(), 0.0)
+                ).map(|x| x * 0.5)
+            }
+
+            PolarizerType::HalfWavePlateFastAxisTheta => {
+                self.jones_matrix = Matrix2::new(
+                    Complex::new(angle.cos().powi(2) - angle.sin().powi(2), 0.0), Complex::new(2.0 * angle.cos() * angle.sin(), 0.0),
+                    Complex::new(2.0 * angle.cos() * angle.sin(), 0.0),           Complex::new(angle.sin().powi(2) - angle.cos().powi(2), 0.0)
+                ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
+            }
+
+            // god had no hand in creating these next 2
+            PolarizerType::GeneralWavePlateLinearRetarderTheta => {
+                let e_to_the_in = Complex::new(0.0, relative_phase_retardation).exp();
+
+                self.jones_matrix = Matrix2::new(
+                    angle.cos().powi(2)         + (e_to_the_in * angle.sin().powi(2)),
+                    (angle.cos() * angle.sin()) - (e_to_the_in * angle.cos() * angle.sin()),
+
+                    (angle.cos() * angle.sin()) - (e_to_the_in * angle.cos() * angle.sin()),
+                    angle.sin().powi(2)         + (e_to_the_in * angle.cos().powi(2)),
+                ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
+            }
+
+            PolarizerType::ArbitraryBirefringentMaterialTheta => {
+                let e_to_the_in   =      Complex::new(0.0, relative_phase_retardation).exp();
+                let e_to_the_i_neg_phi = Complex::new(0.0,-circularity).exp();
+                let e_to_the_i_phi =     Complex::new(0.0, circularity).exp();
+
+                self.jones_matrix = Matrix2::new(
+                     angle.cos().powi(2)                             + (e_to_the_in * angle.sin().powi(2)),
+                    (e_to_the_i_neg_phi * angle.cos() * angle.sin()) - (e_to_the_in * e_to_the_i_neg_phi * angle.cos() * angle.sin()),
+
+                    (e_to_the_i_phi * angle.cos() * angle.sin()) - (e_to_the_in * e_to_the_i_phi * angle.cos() * angle.sin()),
+                     angle.sin().powi(2)          + (e_to_the_in * angle.cos().powi(2)),
+                ).map(|x| x * Complex::new(0.0, -PI / 2.0).exp())
             }
         }
     }

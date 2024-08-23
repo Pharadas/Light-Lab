@@ -63,13 +63,13 @@ impl MenusState {
     }
 
     pub fn debug_menu(&mut self, ui: &mut Ui, world: &mut World, glow_program: MainGlowProgram) {
-        ui.add(Label::new(format!("{:?}", glow_program.current_texture_resolution)));
+        ui.add(Label::new(format!("Current resolution: {:?}", glow_program.current_texture_resolution)));
 
         if ui.add(Button::new("Print hashmap")).clicked() {
             console::log_1(&format!("{:?}", world.hash_map).into());
         }
 
-        // ui.add(Label::new(format!()))
+        ui.add(Label::new(format!("Current object jones matrix: {:#?}", self.object_creation_state.jones_matrix)));
 
         if self.should_display_debug_objects_view {
             if ui.add(Button::new("Hide debug objects view")).clicked() {
@@ -225,6 +225,8 @@ impl MenusState {
                     _ => {}
                 }
 
+                self.object_creation_state.set_jones_matrix(self.selected_polarizer_type, self.angle, self.relative_phase_retardation, self.circularity);
+
                 ui.add_space(10.0);
 
                 ui.add(
@@ -244,11 +246,9 @@ impl MenusState {
                 => {
                 // position, color
             }
-
-            _ => {}
         }
 
-        if ui.add(Button::new("Crear objeto sobre tu posicion")).clicked() {
+        if ui.add(Button::new("Create object in your position")).clicked() {
             world.insert_object(viewer_position.as_i32s(), self.object_creation_state.clone());
         }
     }
