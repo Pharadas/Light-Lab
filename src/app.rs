@@ -119,7 +119,7 @@ impl eframe::App for MainApp {
                     });
 
                     if self.menus.should_display_debug_menu {
-                        egui::Window::new("Debug menu").show(ctx, |ui| {
+                        egui::Window::new("Debug menu").max_height(500.0).show(ctx, |ui| {
                             self.menus.debug_menu(ui, &mut self.world, self.glow_program.lock().clone());
                         });
 
@@ -360,7 +360,7 @@ impl MainGlowProgram {
                 vertex_array,
                 current_texture_resolution: [0, 0],
                 objects_found: vec![0u8],
-                desired_scaling_factor: 0.5,
+                desired_scaling_factor: 0.25,
                 currently_selected_object: 0
             })
         }
@@ -409,6 +409,9 @@ impl MainGlowProgram {
             gl.renderbuffer_storage(glow::RENDERBUFFER, glow::DEPTH24_STENCIL8, texture_resolution[0], texture_resolution[1]);
             gl.framebuffer_renderbuffer(glow::FRAMEBUFFER, glow::DEPTH_STENCIL_ATTACHMENT, glow::RENDERBUFFER, Some(rbo));
 
+            // i would have made my rust structs gpu compatible with some crate
+            // but for some fucking reason glow doesn't offer any 
+            // uniform_1_u8 function
             gl.uniform_2_f32(
                 gl.get_uniform_location(self.main_image_program, "u_rotation").as_ref(),
                 camera.look_direction.x,

@@ -100,10 +100,10 @@ pub struct Polarization {
 pub struct WorldObject {
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
-    center: [f32; 3],
-    top_left: [f32; 3],
-    bottom_right: [f32; 3],
-    radius: f32,
+    pub center: [f32; 3],
+    pub top_left: [f32; 3],
+    pub bottom_right: [f32; 3],
+    pub radius: f32,
     pub polarization: Polarization,
     pub jones_matrix: Matrix2<Complex<f32>>
 }
@@ -117,7 +117,7 @@ enum Max {
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
-    objects: Vec<WorldObject>,
+    pub objects: Vec<WorldObject>,
 }
 
 fn to_f64_slice(a: Vector<f32>) -> [f64; 3] {
@@ -220,7 +220,7 @@ impl World {
     }
 
     pub fn insert_object(&mut self, position: Vector<i32>, object_definition: WorldObject) {
-        self.hash_map.insert((position + Vector::new(100, 100, 100)).as_u32s(), self.objects.len() as u32 + 1);
+        self.hash_map.insert((position + Vector::new(100, 100, 100)).as_u32s(), self.objects.len() as u32);
         self.objects.push(object_definition);
     }
 
@@ -240,10 +240,6 @@ impl World {
                 object.bottom_right[0].to_bits(),
                 object.bottom_right[1].to_bits(),
                 object.bottom_right[2].to_bits(),
-
-                object.top_left[0].to_bits(),
-                object.top_left[1].to_bits(),
-                object.top_left[2].to_bits(),
 
                 object.radius.to_bits(),
 

@@ -4,10 +4,12 @@ in vec4 v_color;
 
 uniform vec2 u_rotation;
 uniform vec3 position; 
-uniform uint objects[3000];
-uniform uint buckets[1000];
 uniform vec2 viewport_dimensions;
 uniform float time;
+
+uniform uint objects[3000];
+uniform uint buckets[1000];
+uniform uint objects_definitions[100];
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 object_found;
@@ -27,31 +29,25 @@ const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using
 const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
 
-struct gsl_complex {
-  float dat[2];
-};
-
-struct ComplexNumber {
-  vec2 dat; // 64 bits
-};
+const uint OBJECT_SIZE = uint(23);
 
 // Complex matrix =
 // |a b|
 // |c d|
 struct Complex2x2Matrix { // 256 bits
-  ComplexNumber a; // 64 bits
-  ComplexNumber b; // 64 bits
-  ComplexNumber c; // 64 bits
-  ComplexNumber d; // 64 bits
+  vec2 a; // 64 bits
+  vec2 b; // 64 bits
+  vec2 c; // 64 bits
+  vec2 d; // 64 bits
 };
 
 struct Polarization { // 128 bits
-  ComplexNumber Ex; // 64 bits
-  ComplexNumber Ey; // 64 bits
+  vec2 Ex; // 64 bits
+  vec2 Ey; // 64 bits
 };
 
 // Struct definitions ====================================
-struct WorldObject { // 736 bits -> 23 bytes
+struct WorldObject { // 736 bits -> 23 of 32 bit objects -> 92 bytes
   uint type; // 32 bits
   vec3 center; // 96 bits
   // top_left and bottom_right will only be relevant if the object is a
@@ -68,8 +64,6 @@ struct WorldObject { // 736 bits -> 23 bytes
   // Will only be relevant if it's an optical object
   Complex2x2Matrix jones_matrix; // 256 bits
 };
-
-uniform WorldObject objects_definitions[100];
 
 struct RayObject {
   // current direction of the ray
@@ -153,10 +147,21 @@ vec3 quadIntersect( in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2, 
     return p + t*rd;
 }
 
-float computeDistance(vec3 A, vec3 B, vec3 C) {
-	float x = length(cross(B - A, C - A));
-	float y = length(B - A);
-	return x / y;
+float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
+    // - r0: ray origin
+    // - rd: normalized ray direction
+    // - s0: sphere center
+    // - sr: sphere radius
+    // - Returns distance from r0 to first intersecion with sphere,
+    //   or -1.0 if no intersection.
+    float a = dot(rd, rd);
+    vec3 s0_r0 = r0 - s0;
+    float b = 2.0 * dot(rd, s0_r0);
+    float c = dot(s0_r0, s0_r0) - (sr * sr);
+    if (b*b - 4.0*a*c < 0.0) {
+        return -1.0;
+    }
+    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);
 }
 
 // Ray marching code
@@ -166,13 +171,64 @@ void step_ray(inout RayObject ray) {
   ray.map_pos += ivec3(vec3(ray.mask)) * ray.step;
 }
 
-void get_object_hit(uint object_index, inout RayObject ray) {
-  WorldObject selected_object = objects_definitions[object_index];
+// object_hit_distance() < 0 means that no object was hit
+float object_hit_distance(uint object_index, RayObject ray) {
+  WorldObject selected_object;
+    // this whole section could break shit,
+    // should add a check here or before sending
+    selected_object.type = objects_definitions[object_index * OBJECT_SIZE];
 
-  if (selected_object.type == CUBE_WALL) {
-    ray.ended_in_hit = true;
-    return;
+    selected_object.center.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(1)]);
+    selected_object.center.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(2)]);
+    selected_object.center.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(3)]);
+
+    selected_object.top_left.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(4)]);
+    selected_object.top_left.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(5)]);
+    selected_object.top_left.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(6)]);
+
+    selected_object.bottom_right.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(7)]);
+    selected_object.bottom_right.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(8)]);
+    selected_object.bottom_right.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(9)]);
+
+    selected_object.radius = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(10)]);
+
+    selected_object.polarization.Ex.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(11)]);
+    selected_object.polarization.Ex.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(12)]);
+
+    selected_object.polarization.Ey.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(13)]);
+    selected_object.polarization.Ey.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(14)]);
+
+    selected_object.jones_matrix.a.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(15)]);
+    selected_object.jones_matrix.a.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(16)]);
+
+    selected_object.jones_matrix.b.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(17)]);
+    selected_object.jones_matrix.b.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(18)]);
+
+    selected_object.jones_matrix.c.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(19)]);
+    selected_object.jones_matrix.c.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(20)]);
+
+    selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(21)]);
+    selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(22)]);
+
+  // if we are checking this cube we definitely hit the cube objects
+  if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
+    return length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
   }
+
+  // if we hit a sphere type, we have to do additional checks
+  if (selected_object.type == LIGHT_SOURCE) {
+    return raySphereIntersect(ray.pos, ray.dir, selected_object.center, selected_object.radius);
+  }
+
+  if (selected_object.type == SQUARE_WALL || selected_object.type == OPTICAL_OBJECT_SQUARE_WALL) {
+
+  }
+
+  if (selected_object.type == ROUND_WALL || selected_object.type == OPTICAL_OBJECT_ROUND_WALL) {
+
+  }
+
+  return -1.0;
 }
 
 // the ray will simply iterate over the space in the direction it's facing trying to hit a 'solid' object
@@ -208,22 +264,36 @@ void iterateRayInDirection(inout RayObject ray) {
       return;
     }
 
-    // search the item in the "linked list"
-    while (objects[(current_index * uint(3)) + uint(2)] != U32_MAX) {
+    float min_distance = 10000.0;
+    bool found_at_least_one_object = false;
+    uint closest_object_index = uint(0);
+
+    // search the item in the "linked list" and save the closest one
+    while (current_index != U32_MAX) {
       if (objects[current_index * uint(3)] == hashed_value) {
-        get_object_hit(current_index + uint(1), ray);
-        ray.object_hit = current_index + uint(1);
-        return;
+        float distance_traveled = object_hit_distance(objects[(current_index * uint(3)) + uint(1)], ray);
+
+        if (distance_traveled > 0.0 && distance_traveled < min_distance) {
+          found_at_least_one_object = true;
+          closest_object_index = current_index;
+          min_distance = distance_traveled;
+        }
       }
 
       current_index = objects[(current_index * uint(3)) + uint(2)];
     }
 
-    if (objects[current_index * uint(3)] == hashed_value) {
-      get_object_hit(objects[current_index * uint(3) + uint(1)], ray);
-      ray.object_hit = objects[current_index * uint(3) + uint(1)]; // key.val
+    if (found_at_least_one_object) {
+      ray.object_hit = objects[(closest_object_index * uint(3)) + uint(1)];
+      ray.ended_in_hit = true;
       return;
     }
+
+//    if (objects[current_index * uint(3)] == hashed_value && object_hit_distance(objects[(current_index * uint(3)) + uint(1)], ray)) {
+//      ray.object_hit = objects[current_index * uint(3) + uint(1)]; // key.val
+//      ray.ended_in_hit = true;
+//      return;
+//    }
 
     if ((ray.map_pos.x > 100 || ray.map_pos.x <= 0) || 
         (ray.map_pos.y > 100 || ray.map_pos.y <= 0) ||

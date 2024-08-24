@@ -1,9 +1,10 @@
 use std::f32::consts::PI;
 
 use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
+use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
 use math_vector::Vector;
-use egui_plot::{Plot, PlotPoints};
+use egui_plot::Plot;
 use web_sys::console;
 
 use crate::{app::MainGlowProgram, world::{ObjectType, PolarizerType, World, WorldObject}};
@@ -64,6 +65,37 @@ impl MenusState {
 
     pub fn debug_menu(&mut self, ui: &mut Ui, world: &mut World, glow_program: MainGlowProgram) {
         ui.add(Label::new(format!("Current resolution: {:?}", glow_program.current_texture_resolution)));
+
+        egui::CollapsingHeader::new("Gpu compatible objects list")
+            .show(ui, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.add(Label::new(format!("{:?}", world.get_gpu_compatible_world_objects_list().chunks(23).into_iter().map(|chunk| chunk).collect::<Vec<&[u32]>>())));
+            });
+        });
+
+        TableBuilder::new(ui)
+            .column(Column::auto().resizable(true))
+            .column(Column::remainder())
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.heading("Index");
+                });
+                header.col(|ui| {
+                    ui.heading("World object");
+                });
+            })
+            .body(|mut body| {
+                for i in 0..world.objects.len() {
+                    body.row(10.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label(format!("{:?}", i));
+                        });
+                        row.col(|ui| {
+                            ui.label(format!("{:?}", world.objects[i]));
+                        });
+                    });
+                }
+            });
 
         if ui.add(Button::new("Print hashmap")).clicked() {
             console::log_1(&format!("{:?}", world.hash_map).into());
@@ -162,7 +194,8 @@ impl MenusState {
 
         match self.object_creation_state.object_type {
             ObjectType::LightSource => {
-                // Polarization, color
+                self.object_creation_state.center = [viewer_position.x + 0.5, viewer_position.y + 0.5, viewer_position.z + 0.5];
+                self.object_creation_state.radius = 0.5;
             }
 
             ObjectType::OpticalObjectCube       |
