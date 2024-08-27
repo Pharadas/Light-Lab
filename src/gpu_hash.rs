@@ -1,3 +1,5 @@
+use std::u32;
+
 use nalgebra::Vector3;
 use web_sys::console;
 
@@ -12,7 +14,7 @@ pub struct KeyValue {
 pub struct GPUHashTable {
     pub buckets: Vec<u32>,
     pub objects: Vec<KeyValue>,
-    objects_left: Vec<usize>, // should probably be a linked list as it will be acting as a stack
+    objects_left: Vec<usize>,
     block_size: Vector3<u32>,
 }
 
@@ -31,8 +33,6 @@ impl GPUHashTable {
         return val.x + self.block_size.y * (val.y + self.block_size.z * val.z);
     }
 
-    fn resize(&mut self) {} // TODO
-
     pub fn insert(&mut self, key: Vector3<u32>, val: u32)  {
         // console::log_1(&self.objects_last.into());
 
@@ -43,6 +43,8 @@ impl GPUHashTable {
 
         let original_hash = self.hash(key);
         let index = (original_hash % 1000) as usize;
+        console::log_1(&format!("creating object and putting it at index: {:?}", index).into());
+
         let mut current_object: KeyValue;
 
         if self.objects_left.is_empty() {
@@ -67,7 +69,7 @@ impl GPUHashTable {
 
         while current_object.next != u32::MAX {
             if current_object.value == val && current_object.key == original_hash { // in case we already stored this same value
-                console::log_1(&format!("key {:?} was already stored", current_object.key).into());
+                console::log_1(&format!("key {:?} with value {:?} was already stored", current_object.key, current_object.value).into());
                 return;
             }
 
@@ -86,26 +88,41 @@ impl GPUHashTable {
 
     pub fn remove(&mut self, key: Vector3<u32>, val: u32) {
         let original_hash = self.hash(key);
-        let index = (original_hash % 1000) as usize;
-        let mut current_object: KeyValue;
+        let bucket_index = (original_hash % 1000) as usize;
 
         // if we reach this part of the code, then this bucket isn't empty, let's find the last item of
         // the bucket by following it as a linked list
-        current_object = self.objects[self.buckets[index] as usize];
-        let mut last_next = self.buckets[index];
+        let mut current_object = self.objects[self.buckets[bucket_index] as usize];
+        console::log_1(&format!("{:?}", current_object).into());
 
-        while current_object.next != u32::MAX {
+        let mut last_index = u32::MAX;
+        let mut current_index = self.buckets[bucket_index];
+
+        while current_index as u32 != u32::MAX {
+            current_object = self.objects[current_index as usize];
+
             if current_object.value == val && current_object.key == original_hash { // in case we already stored this same value
-                console::log_1(&format!("removing key {:?}", current_object.key).into());
-                // update the 'linked list'
-                let next = self.objects[last_next as usize].next;
-                self.objects[next as usize] = KeyValue {key: 0, value: 0, next: u32::MAX};
-                self.objects[last_next as usize].next = current_object.next;
-                return;
+                self.objects_left.push(current_index as usize); // "liberate" this index
+
+                // the simplest case, there's only one item left and
+                // it's the one we want to remove
+                if last_index == u32::MAX && current_object.next == u32::MAX {
+                    self.objects[current_index as usize] = KeyValue {key: 0, value: 0, next: u32::MAX};
+                    self.buckets[bucket_index] = u32::MAX;
+                    self.objects_left.push(current_index as usize);
+                }
+
+                // console::log_1(&format!("removing key {:?}", current_object.key).into());
+                // // update the 'linked list'
+                // let next = self.objects[last_next as usize].next;
+                // self.objects[next as usize] = KeyValue {key: 0, value: 0, next: u32::MAX};
+                // // give this space back to the available items
+                // self.objects_left.push(next as usize);
+                // self.objects[last_next as usize].next = current_object.next;
             }
 
-            last_next = current_object.next;
-            current_object = self.objects[current_object.next as usize];
+            last_index = current_index;
+            current_index = current_object.next;
         }
 
         console::log_1(&format!("key {:?} didn't exist so it wasn't removed", current_object.key).into());

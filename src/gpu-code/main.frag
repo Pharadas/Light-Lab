@@ -221,54 +221,54 @@ float object_hit_distance(uint object_index, RayObject ray) {
     vec3 a = rotate3dY(
         rotate3dX(
             vec3(
-                selected_object.center.x - selected_object.width, 
-                selected_object.center.y + selected_object.height, 
-                selected_object.center.z
+                -selected_object.width,
+                0.0,
+                selected_object.height
             ),
-            selected_object.rotation.x
+            selected_object.rotation.y
         ),
-        selected_object.rotation.y
+        selected_object.rotation.x
     );
 
     vec3 b = rotate3dY(
         rotate3dX(
             vec3(
-                selected_object.center.x + selected_object.width, 
-                selected_object.center.y + selected_object.height, 
-                selected_object.center.z
+                selected_object.width,
+                0.0,
+                selected_object.height
             ),
-            selected_object.rotation.x
+            selected_object.rotation.y
         ),
-        selected_object.rotation.y
+        selected_object.rotation.x
     );
 
     vec3 c = rotate3dY(
         rotate3dX(
             vec3(
-                selected_object.center.x - selected_object.width, 
-                selected_object.center.y - selected_object.height, 
-                selected_object.center.z
+                -selected_object.width,
+                0.0,
+                -selected_object.height
             ),
-            selected_object.rotation.x
+            selected_object.rotation.y
         ),
-        selected_object.rotation.y
+        selected_object.rotation.x
     );
 
     vec3 d = rotate3dY(
         rotate3dX(
             vec3(
-                selected_object.center.x + selected_object.width, 
-                selected_object.center.y - selected_object.height, 
-                selected_object.center.z
+                selected_object.width, 
+                0.0,
+                -selected_object.height
             ),
-            selected_object.rotation.x
+            selected_object.rotation.y
         ),
-        selected_object.rotation.y
+        selected_object.rotation.x
     );
 
-    float distance = length(quadIntersect(ray.pos, ray.dir, a, b, c, d));
+    float distance = length(quadIntersect(ray.pos, ray.dir, selected_object.center + a, selected_object.center + b, selected_object.center + c, selected_object.center + d));
 
-    if (distance < 0.4) {
+    if (distance < selected_object.radius) {
       return distance;
     }
 

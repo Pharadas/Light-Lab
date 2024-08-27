@@ -51,7 +51,7 @@ impl MenusState {
             angle: 0f32,
             relative_phase_retardation: 0f32,
             circularity: 0f32,
-            object_creation_state: WorldObject::new(ObjectType::CubeWall),
+            object_creation_state: WorldObject::new(),
             image_texture,
             debug_texture,
             raw_images,
@@ -137,12 +137,17 @@ impl MenusState {
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: usize) {
         ui.add(Label::new(format!("{:?}", world.objects[selected_object_index])));
 
+        if ui.add(Button::new("Remove object")).clicked() {
+            world.remove_object(selected_object_index);
+        }
+
         let mut shapes = vec![];
 
-        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[0], -150.0..=150.0).text("X rotation"));
-        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[1], -150.0..=150.0).text("Y rotation"));
+        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
+        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
+        ui.add(Slider::new(&mut world.objects[selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
 
-        let response = Plot::new("my_plot")
+        let response = Plot::new("rotation_plot")
         .allow_drag(false)
         .allow_boxed_zoom(false)
         .allow_zoom(false)
@@ -153,20 +158,13 @@ impl MenusState {
         .view_aspect(1.0)
         .show(ui, |plot_ui| {
             // vertical
-            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(1.0, 150.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
             shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(world.objects[selected_object_index].rotation[0].abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
 
             // horizontal
-            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, 1.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
             shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, world.objects[selected_object_index].rotation[1].abs()), Stroke::new(1.0, Color32::GREEN)));
 
-            // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), self.rotation.abs(), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
-
-            world.objects[selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 20.0;
-            world.objects[selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 20.0;
-            // console::log_1(&format!("{:?}", plot_ui.pointer_coordinate_drag_delta()).into());
-            // plot_ui.line(ellipse_top_half);
-            // plot_ui.line(ellipse_bottom_half);
+            world.objects[selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 0.1;
+            world.objects[selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 0.1;
         }).response;
 
         ui.painter().with_clip_rect(response.rect).extend(shapes);
@@ -241,12 +239,12 @@ impl MenusState {
                     }
 
                     PolarizerType::GeneralWavePlateLinearRetarderTheta => {
-                        ui.add(Slider::new(&mut self.angle, 0.0..=2.0*PI).text("θ"));
+                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
                         ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
                     }
 
                     PolarizerType::ArbitraryBirefringentMaterialTheta => {
-                        ui.add(Slider::new(&mut self.angle, 0.0..=2.0*PI).text("θ"));
+                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
                         ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
                         ui.add(Slider::new(&mut self.circularity, (-PI/2.0)..=(PI/2.0)).text("Circularity (φ)"));
                     }
@@ -273,7 +271,8 @@ impl MenusState {
             ObjectType::RoundWall  |
             ObjectType::SquareWall
                 => {
-                // position, color
+                self.object_creation_state.center = [viewer_position.x, viewer_position.y, viewer_position.z];
+                self.object_creation_state.radius = 0.5;
             }
         }
 

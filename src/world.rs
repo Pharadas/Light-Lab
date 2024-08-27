@@ -3,7 +3,7 @@ use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 use web_sys::console;
 use serde::{Deserialize, Serialize};
 
-use crate::{gpu_hash::GPUHashTable, util::{i32_to_f32_vec, i32_to_u32_vec, to_f64_slice}};
+use crate::{gpu_hash::GPUHashTable, util::{f32_slice_to_u32_vec, i32_to_f32_vec, i32_to_u32_vec, to_f64_slice}};
 
 // maybe should move this to a math.rs module or something
 pub fn rotate3d_y(v: Vector3<f32>, a: f32) -> Vector3<f32> {
@@ -112,7 +112,7 @@ pub struct Polarization {
     ey: Complex<f32>
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct WorldObject {
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
@@ -133,7 +133,8 @@ enum Max {
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
-    pub objects: Vec<WorldObject>,
+    pub objects: [WorldObject; 200],
+    objects_stack: Vec<usize>
 }
 
 // Thanks to https://github.com/leroycep/ascii-raycaster/blob/master/src/main.rs
@@ -201,15 +202,29 @@ impl World {
     pub fn new() -> World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
-            objects: vec![],
+            objects: [WorldObject::new(); 200],
+            objects_stack: (1..200).collect()
         }
     }
 
+    pub fn remove_object(&mut self, object_index: usize) {
+        let selected_object = self.objects[object_index].clone();
+
+        self.hash_map.remove(f32_slice_to_u32_vec(selected_object.center) + Vector3::new(100, 100, 100), object_index as u32);
+
+        // we must also remove it from the objects list
+        // and mark that space as available
+        self.objects[object_index] = WorldObject::new();
+        self.objects_stack.push(object_index);
+    }
+
     pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) {
+        let available_index = self.objects_stack.pop().unwrap();
+
         match object_definition.object_type {
             ObjectType::CubeWall |
             ObjectType::OpticalObjectCube => {
-                self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+                self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), available_index as u32);
             }
 
             ObjectType::LightSource => {
@@ -219,7 +234,7 @@ impl World {
                 for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
                     for y in (center[1] - truncated_radius)..=(center[1] + truncated_radius) {
                         for z in (center[2] - truncated_radius)..=(center[2] + truncated_radius) {
-                            self.hash_map.insert(Vector3::new(x, y, z) + Vector3::new(100, 100, 100), self.objects.len() as u32);
+                            self.hash_map.insert(Vector3::new(x, y, z) + Vector3::new(100, 100, 100), available_index as u32);
                         }
                     }
                 }
@@ -282,14 +297,14 @@ impl World {
                 path_to_search_rasterized.extend(raymarch(to_f64_slice(c), to_f64_slice(d - c), to_f64_slice(d), Max::Steps(50)));
 
                 for position in path_to_search_rasterized {
-                    self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+                    self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), available_index as u32);
                     // now just keep firing rays to every position and rasterizing
                     let a_through_position_rasterized = raymarch(to_f64_slice(a), to_f64_slice(i32_to_f32_vec(position) - a), to_f64_slice(i32_to_f32_vec(position)), Max::Steps(50));
                     // console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
 
                     // just put it into the grid
                     for new_position in a_through_position_rasterized {
-                        self.hash_map.insert(i32_to_u32_vec(new_position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+                        self.hash_map.insert(i32_to_u32_vec(new_position + Vector3::new(100, 100, 100)), available_index as u32);
                     }
                 }
             }
@@ -297,7 +312,9 @@ impl World {
 
         // TODO this should change to a stack like with the
         // hashmap buckets
-        self.objects.push(object_definition);
+        // should handle the case when the object stack is full
+        console::log_1(&format!("{:?}", available_index).into());
+        self.objects[available_index] = object_definition;
     }
 
     pub fn get_gpu_compatible_world_objects_list(&self) -> Vec<u32> {
@@ -340,14 +357,14 @@ impl World {
 }
 
 impl WorldObject {
-    pub fn new(object_type: ObjectType) -> WorldObject {
+    pub fn new() -> WorldObject {
         return WorldObject {
             object_type: ObjectType::CubeWall,
             rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
-            width: 1.0,
-            height: 1.0,
+            width: 0.1,
+            height: 0.1,
 
             radius: 0.0,
 
