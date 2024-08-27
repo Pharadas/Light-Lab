@@ -4,7 +4,7 @@ use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, Text
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
 use egui_plot::Plot;
-use nalgebra::Vector3;
+use nalgebra::{RealField, Vector3};
 use web_sys::console;
 
 use crate::{app::MainGlowProgram, world::{ObjectType, PolarizerType, World, WorldObject}};
@@ -142,33 +142,43 @@ impl MenusState {
             *selected_object_index = 0;
         }
 
-        let mut shapes = vec![];
+        if (
+            world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
+            world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
+            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
+            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
+        ) {
+            let mut shapes = vec![];
 
-        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
-        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
-        ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
 
-        let response = Plot::new("rotation_plot")
-        .allow_drag(false)
-        .allow_boxed_zoom(false)
-        .allow_zoom(false)
-        .include_x(1.0)
-        .include_y(1.0)
-        .include_x(-1.0)
-        .include_y(-1.0)
-        .view_aspect(1.0)
-        .show(ui, |plot_ui| {
-            // vertical
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(world.objects[*selected_object_index].rotation[0].abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
+            let response = Plot::new("rotation_plot")
+            .allow_drag(false)
+            .allow_boxed_zoom(false)
+            .allow_zoom(false)
+            .include_x(1.0)
+            .include_y(1.0)
+            .include_x(-1.0)
+            .include_y(-1.0)
+            .view_aspect(1.0)
+            .show(ui, |plot_ui| {
+                // vertical
+                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new((world.objects[*selected_object_index].rotation[0].abs() * 150.0) / (2.0 * PI), 150.0), Stroke::new(1.0, Color32::BLUE)));
 
-            // horizontal
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, world.objects[*selected_object_index].rotation[1].abs()), Stroke::new(1.0, Color32::GREEN)));
+                // horizontal
+                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, (world.objects[*selected_object_index].rotation[1].abs() * 150.0) / (2.0 * PI)), Stroke::new(1.0, Color32::GREEN)));
 
-            world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 0.1;
-            world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 0.1;
-        }).response;
+                world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 2.0;
+                world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 2.0;
 
-        ui.painter().with_clip_rect(response.rect).extend(shapes);
+                world.objects[*selected_object_index].rotation[0] = world.objects[*selected_object_index].rotation[0].clamp(0.0, 2.0 * PI);
+                world.objects[*selected_object_index].rotation[1] = world.objects[*selected_object_index].rotation[1].clamp(0.0, 2.0 * PI);
+            }).response;
+
+            ui.painter().with_clip_rect(response.rect).extend(shapes);
+        }
     }
 
     pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector3<f32>) {
