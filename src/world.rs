@@ -1,10 +1,33 @@
 use std::{f32::consts::PI, fmt::{self, Display, Formatter}};
-use nalgebra::{Complex, ComplexField, Matrix2, SimdValue};
+use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 use web_sys::console;
-use math_vector::Vector;
 use serde::{Deserialize, Serialize};
 
-use crate::gpu_hash::GPUHashTable;
+use crate::{gpu_hash::GPUHashTable, util::{i32_to_f32_vec, i32_to_u32_vec, to_f64_slice}};
+
+// maybe should move this to a math.rs module or something
+pub fn rotate3d_y(v: Vector3<f32>, a: f32) -> Vector3<f32> {
+    let cos_a = a.cos();
+    let sin_a = a.sin();
+
+    return Vector3::new(
+        v.x * cos_a + v.z * sin_a,
+        v.y,
+        -v.x * sin_a + v.z * cos_a
+    );
+}
+
+pub fn rotate3d_x(v: Vector3<f32>, a: f32) -> Vector3<f32> {
+    let cos_a = a.cos();
+    let sin_a = a.sin();
+
+    return Vector3::new(
+        v.x,
+        v.y * cos_a - v.z * sin_a,
+        v.y * sin_a + v.z * cos_a
+    );
+}
+
 
 // WorldObject.type possible values
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -84,13 +107,6 @@ impl Display for PolarizerType {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Triangle {
-    p0: Vector<f32>,
-    p1: Vector<f32>,
-    p2: Vector<f32>
-}
-
-#[derive(Debug, Clone, Copy)]
 pub struct Polarization {
     ex: Complex<f32>,
     ey: Complex<f32>
@@ -101,8 +117,8 @@ pub struct WorldObject {
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
     pub center: [f32; 3],
-    pub top_left: [f32; 3],
-    pub bottom_right: [f32; 3],
+    pub width: f32,
+    pub height: f32,
     pub radius: f32,
     pub polarization: Polarization,
     pub jones_matrix: Matrix2<Complex<f32>>
@@ -120,13 +136,9 @@ pub struct World {
     pub objects: Vec<WorldObject>,
 }
 
-fn to_f64_slice(a: Vector<f32>) -> [f64; 3] {
-    return [a.x as f64, a.y as f64, a.z as f64];
-}
-
 // Thanks to https://github.com/leroycep/ascii-raycaster/blob/master/src/main.rs
-fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Vector<i32>> {
-    let mut tiles_found: Vec<Vector<i32>> = vec![];
+fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Vector3<i32>> {
+    let mut tiles_found: Vec<Vector3<i32>> = vec![];
 
     let (max_steps, _max_distance) = match max {
         Max::Steps(num) => (num, ::std::f64::INFINITY),
@@ -152,7 +164,7 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Ve
         }
     }
 
-    let mut last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
+    let mut last_distance = (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude();
 
     for _ in 0..max_steps {
         if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
@@ -168,14 +180,14 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Ve
             map_pos[2] += step[2];
             _side = 2;
         }
-        tiles_found.push(Vector::new(map_pos[0] as i32, map_pos[1] as i32, map_pos[2] as i32));
+        tiles_found.push(Vector3::new(map_pos[0] as i32, map_pos[1] as i32, map_pos[2] as i32));
 
-        if (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length() > last_distance { // check that we are getting closer
+        if (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude() > last_distance { // check that we are getting closer
             console::log_1(&"exited ray caster when ray passed target".into());
             return tiles_found;
         }
 
-        last_distance = (Vector::new(map_pos[0], map_pos[1], map_pos[2]) - Vector::new(end_pos[0], end_pos[1], end_pos[2])).length();
+        last_distance = (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude();
 
         if map_pos[0] as i32 == end_pos[0] as i32 && map_pos[1] as i32 == end_pos[1] as i32 && map_pos[2] as i32 == end_pos[2] as i32 {
             console::log_1(&"exited ray caster normally".into());
@@ -187,40 +199,104 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Ve
 
 impl World {
     pub fn new() -> World {
-        // let sample_triangle = Triangle {
-        //     p0: Vector::new(5.3,   5.3, 5.3),
-        //     p1: Vector::new(-5.3,  5.3, -5.3),
-        //     p2: Vector::new(-5.3, -5.3, 5.3)
-        // };
-
-        // let mut gpu_hash = GPUHashTable::new(Vector::new(200, 200, 200));
-
-        // let a_through_b_rasterized = raymarch(to_f64_slice(sample_triangle.p0), to_f64_slice(sample_triangle.p1 - sample_triangle.p0), to_f64_slice(sample_triangle.p1), Max::Steps(50));
-
-        // console::log_1(&format!("final list: {:?}", a_through_b_rasterized).into());
-
-        // for position in a_through_b_rasterized {
-        //     gpu_hash.insert((position + Vector::new(100, 100, 100)).as_u32s(), 1);
-        //     // now just keep firing rays to every position and rasterizing
-        //     let c_through_position_rasterized = raymarch(to_f64_slice(sample_triangle.p2), to_f64_slice(position.as_f32s() - sample_triangle.p2), to_f64_slice(position.as_f32s()), Max::Steps(50));
-        //     console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
-
-        //     // just put it into the grid
-        //     for new_position in c_through_position_rasterized {
-        //         gpu_hash.insert((new_position + Vector::new(100, 100, 100)).as_u32s(), 1);
-        //     }
-        // }
-
-        // gpu_hash.insert(Vector::new(100u32, 100u32, 100u32), 1);
-
         return World {
-            hash_map: GPUHashTable::new(Vector::new(200, 200, 200)),
+            hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
             objects: vec![],
         }
     }
 
-    pub fn insert_object(&mut self, position: Vector<i32>, object_definition: WorldObject) {
-        self.hash_map.insert((position + Vector::new(100, 100, 100)).as_u32s(), self.objects.len() as u32);
+    pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) {
+        match object_definition.object_type {
+            ObjectType::CubeWall |
+            ObjectType::OpticalObjectCube => {
+                self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+            }
+
+            ObjectType::LightSource => {
+                let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
+                let truncated_radius = object_definition.radius as u32 + 1;
+
+                for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
+                    for y in (center[1] - truncated_radius)..=(center[1] + truncated_radius) {
+                        for z in (center[2] - truncated_radius)..=(center[2] + truncated_radius) {
+                            self.hash_map.insert(Vector3::new(x, y, z) + Vector3::new(100, 100, 100), self.objects.len() as u32);
+                        }
+                    }
+                }
+            }
+
+            ObjectType::RoundWall              |
+            ObjectType::OpticalObjectRoundWall |
+            ObjectType::SquareWall             |
+            ObjectType::OpticalObjectSquareWall => {
+                let a = rotate3d_y(
+                    rotate3d_x(
+                        Vector3::new(
+                            object_definition.center[0] - object_definition.width, 
+                            object_definition.center[1] + object_definition.height, 
+                            object_definition.center[2]
+                        ),
+                        object_definition.rotation[1]
+                    ),
+                    object_definition.rotation[0]
+                );
+
+                let b = rotate3d_y(
+                    rotate3d_x(
+                        Vector3::new(
+                            object_definition.center[0] + object_definition.width, 
+                            object_definition.center[1] + object_definition.height, 
+                            object_definition.center[2]
+                        ),
+                        object_definition.rotation[1]
+                    ),
+                    object_definition.rotation[0]
+                );
+
+                let c = rotate3d_y(
+                    rotate3d_x(
+                        Vector3::new(
+                            object_definition.center[0] - object_definition.width, 
+                            object_definition.center[1] - object_definition.height, 
+                            object_definition.center[2]
+                        ),
+                        object_definition.rotation[1]
+                    ),
+                    object_definition.rotation[0]
+                );
+
+                let d = rotate3d_y(
+                    rotate3d_x(
+                        Vector3::new(
+                            object_definition.center[0] + object_definition.width, 
+                            object_definition.center[1] - object_definition.height, 
+                            object_definition.center[2]
+                        ),
+                        object_definition.rotation[1]
+                    ),
+                    object_definition.rotation[0]
+                );
+
+                // rasterize(b -> c).extend(rasterize(c -> d))
+                let mut path_to_search_rasterized = raymarch(to_f64_slice(b), to_f64_slice(c - b), to_f64_slice(c), Max::Steps(50));
+                path_to_search_rasterized.extend(raymarch(to_f64_slice(c), to_f64_slice(d - c), to_f64_slice(d), Max::Steps(50)));
+
+                for position in path_to_search_rasterized {
+                    self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+                    // now just keep firing rays to every position and rasterizing
+                    let a_through_position_rasterized = raymarch(to_f64_slice(a), to_f64_slice(i32_to_f32_vec(position) - a), to_f64_slice(i32_to_f32_vec(position)), Max::Steps(50));
+                    // console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
+
+                    // just put it into the grid
+                    for new_position in a_through_position_rasterized {
+                        self.hash_map.insert(i32_to_u32_vec(new_position + Vector3::new(100, 100, 100)), self.objects.len() as u32);
+                    }
+                }
+            }
+        }
+
+        // TODO this should change to a stack like with the
+        // hashmap buckets
         self.objects.push(object_definition);
     }
 
@@ -229,17 +305,15 @@ impl World {
             [
                 object.object_type as u32,
 
+                object.rotation[0].to_bits(),
+                object.rotation[1].to_bits(),
+
                 object.center[0].to_bits(),
                 object.center[1].to_bits(),
                 object.center[2].to_bits(),
 
-                object.top_left[0].to_bits(),
-                object.top_left[1].to_bits(),
-                object.top_left[2].to_bits(),
-
-                object.bottom_right[0].to_bits(),
-                object.bottom_right[1].to_bits(),
-                object.bottom_right[2].to_bits(),
+                object.width.to_bits(),
+                object.height.to_bits(),
 
                 object.radius.to_bits(),
 
@@ -272,8 +346,8 @@ impl WorldObject {
             rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
-            top_left: [0.0, 0.0, 0.0],
-            bottom_right: [0.0, 0.0, 0.0],
+            width: 1.0,
+            height: 1.0,
 
             radius: 0.0,
 

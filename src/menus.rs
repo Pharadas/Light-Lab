@@ -3,16 +3,15 @@ use std::f32::consts::PI;
 use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
-use math_vector::Vector;
 use egui_plot::Plot;
+use nalgebra::Vector3;
 use web_sys::console;
 
 use crate::{app::MainGlowProgram, world::{ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
-    selected_object: Option<WorldObject>,
+    pub selected_object: Option<WorldObject>,
     selected_polarizer_type: PolarizerType,
-    rotation: Vec2,
     angle: f32,
     relative_phase_retardation: f32,
     circularity: f32,
@@ -49,7 +48,6 @@ impl MenusState {
         return MenusState {
             selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
-            rotation: Vec2::new(150.0, 150.0),
             angle: 0f32,
             relative_phase_retardation: 0f32,
             circularity: 0f32,
@@ -69,7 +67,7 @@ impl MenusState {
         egui::CollapsingHeader::new("Gpu compatible objects list")
             .show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.add(Label::new(format!("{:?}", world.get_gpu_compatible_world_objects_list().chunks(23).into_iter().map(|chunk| chunk).collect::<Vec<&[u32]>>())));
+                ui.add(Label::new(format!("{:?}", world.get_gpu_compatible_world_objects_list().chunks(21).into_iter().map(|chunk| chunk).collect::<Vec<&[u32]>>())));
             });
         });
 
@@ -136,16 +134,13 @@ impl MenusState {
         }
     }
 
-    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64) {
-        ui.add(Label::new(format!("{:?}", self.object_creation_state.object_type)));
-
-        // load object data
-
+    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: usize) {
+        ui.add(Label::new(format!("{:?}", world.objects[selected_object_index])));
 
         let mut shapes = vec![];
 
-        ui.add(Slider::new(&mut self.rotation.x, -150.0..=150.0).text("X rotation"));
-        ui.add(Slider::new(&mut self.rotation.y, -150.0..=150.0).text("Y rotation"));
+        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[0], -150.0..=150.0).text("X rotation"));
+        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[1], -150.0..=150.0).text("Y rotation"));
 
         let response = Plot::new("my_plot")
         .allow_drag(false)
@@ -159,15 +154,16 @@ impl MenusState {
         .show(ui, |plot_ui| {
             // vertical
             // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(1.0, 150.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(self.rotation.x.abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(world.objects[selected_object_index].rotation[0].abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
 
             // horizontal
             // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, 1.0), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, self.rotation.y.abs()), Stroke::new(1.0, Color32::GREEN)));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, world.objects[selected_object_index].rotation[1].abs()), Stroke::new(1.0, Color32::GREEN)));
 
             // shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), self.rotation.abs(), Stroke::new(1.0, Color32::from_rgb(255, 0, 0))));
 
-            self.rotation += plot_ui.pointer_coordinate_drag_delta() * 20.0;
+            world.objects[selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 20.0;
+            world.objects[selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 20.0;
             // console::log_1(&format!("{:?}", plot_ui.pointer_coordinate_drag_delta()).into());
             // plot_ui.line(ellipse_top_half);
             // plot_ui.line(ellipse_bottom_half);
@@ -176,7 +172,7 @@ impl MenusState {
         ui.painter().with_clip_rect(response.rect).extend(shapes);
     }
 
-    pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector<f32>) {
+    pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector3<f32>) {
         egui::ComboBox::from_label("Polarizer/Phase retarder")
             .selected_text(format!("{}", self.object_creation_state.object_type))
             .show_ui(ui, |ui| {
@@ -194,7 +190,7 @@ impl MenusState {
 
         match self.object_creation_state.object_type {
             ObjectType::LightSource => {
-                self.object_creation_state.center = [viewer_position.x + 0.5, viewer_position.y + 0.5, viewer_position.z + 0.5];
+                self.object_creation_state.center = [viewer_position.x, viewer_position.y, viewer_position.z];
                 self.object_creation_state.radius = 0.5;
             }
 
@@ -282,7 +278,7 @@ impl MenusState {
         }
 
         if ui.add(Button::new("Create object in your position")).clicked() {
-            world.insert_object(viewer_position.as_i32s(), self.object_creation_state.clone());
+            world.insert_object(Vector3::from_vec(viewer_position.as_slice().into_iter().map(|x| *x as i32).collect()), self.object_creation_state.clone());
         }
     }
 }

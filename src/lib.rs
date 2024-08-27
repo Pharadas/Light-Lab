@@ -6,5 +6,6 @@ mod camera;
 mod world;
 mod menus;
 mod tests;
+mod util;
 
 pub use app::MainApp;

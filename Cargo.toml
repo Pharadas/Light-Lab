@@ -23,7 +23,6 @@ as-bytes = "0.2.0"
 
 # You only need serde if you want app persistence:
 serde = { version = "1", features = ["derive"] }
-math_vector = "0.2.1"
 egui_plot = "0.28.1"
 wasm-bindgen = "0.2"
 slice-of-array = "0.3.2"

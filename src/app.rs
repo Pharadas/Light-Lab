@@ -108,7 +108,7 @@ impl eframe::App for MainApp {
 
                     if self.glow_program.lock().currently_selected_object != 0 {
                         egui::Window::new("Object inspector").show(ctx, |ui| {
-                            self.menus.inspect_object_menu(ui, &mut self.world, self.time);
+                            self.menus.inspect_object_menu(ui, &mut self.world, self.time, self.glow_program.lock().currently_selected_object);
                             // color_picker_color32(ui, &mut Color32::from_rgb(255, 20, 20), Alpha::Opaque);
                         });
                     }

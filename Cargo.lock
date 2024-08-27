@@ -1751,7 +1751,6 @@ dependencies = [
  "env_logger",
  "image 0.24.9",
  "log",
- "math_vector",
  "nalgebra",
  "serde",
  "slice-of-array",
@@ -1801,15 +1800,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "math_vector"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0b04d86d1f2c85e149f3a7f25f6e2dadbd0c7bc1549c8841610de2a683a78d"
-dependencies = [
- "proc_vector",
 ]
 
 [[package]]
@@ -2388,12 +2378,6 @@ checksum = "95fc56cda0b5c3325f5fbbd7ff9fda9e02bb00bb3dac51252d2f1bfa1cb8cc8c"
 dependencies = [
  "unicode-ident",
 ]
-
-[[package]]
-name = "proc_vector"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6cee552131901ddbd806c8c9d200a95ef481a399b78b215c3f00575e11175b7"
 
 [[package]]
 name = "qoi"

@@ -9,7 +9,7 @@ uniform float time;
 
 uniform uint objects[3000];
 uniform uint buckets[1000];
-uniform uint objects_definitions[100];
+uniform uint objects_definitions[3000];
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 object_found;
@@ -29,7 +29,7 @@ const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using
 const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
 
-const uint OBJECT_SIZE = uint(23);
+const uint OBJECT_SIZE = uint(21);
 
 // Complex matrix =
 // |a b|
@@ -47,22 +47,21 @@ struct Polarization { // 128 bits
 };
 
 // Struct definitions ====================================
-struct WorldObject { // 736 bits -> 23 of 32 bit objects -> 92 bytes
-  uint type; // 32 bits
-  vec3 center; // 96 bits
-  // top_left and bottom_right will only be relevant if the object is a
-  // square of round wall
-  vec3 top_left; // 96 bits
-  vec3 bottom_right; // 96 bits
+struct WorldObject {
+  uint type;
+  vec2 rotation;
+  vec3 center;
+  float width;
+  float height;
   // Will only be relevant if the object is a round wall
   // or a light source
   // will be the radius of the sphere if it's a light source
   // and the radius of the wall
-  float radius; // 32 bits
+  float radius;
   // Will only be relevant if it's a light source
-  Polarization polarization; // 128 bits
+  Polarization polarization;
   // Will only be relevant if it's an optical object
-  Complex2x2Matrix jones_matrix; // 256 bits
+  Complex2x2Matrix jones_matrix;
 };
 
 struct RayObject {
@@ -178,37 +177,35 @@ float object_hit_distance(uint object_index, RayObject ray) {
     // should add a check here or before sending
     selected_object.type = objects_definitions[object_index * OBJECT_SIZE];
 
-    selected_object.center.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(1)]);
-    selected_object.center.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(2)]);
-    selected_object.center.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(3)]);
+    selected_object.rotation.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(1)]);
+    selected_object.rotation.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(2)]);
 
-    selected_object.top_left.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(4)]);
-    selected_object.top_left.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(5)]);
-    selected_object.top_left.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(6)]);
+    selected_object.center.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(3)]);
+    selected_object.center.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(4)]);
+    selected_object.center.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(5)]);
 
-    selected_object.bottom_right.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(7)]);
-    selected_object.bottom_right.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(8)]);
-    selected_object.bottom_right.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(9)]);
+    selected_object.width = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(6)]);
+    selected_object.height = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(7)]);
 
-    selected_object.radius = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(10)]);
+    selected_object.radius = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(8)]);
 
-    selected_object.polarization.Ex.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(11)]);
-    selected_object.polarization.Ex.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(12)]);
+    selected_object.polarization.Ex.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(9)]);
+    selected_object.polarization.Ex.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(10)]);
 
-    selected_object.polarization.Ey.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(13)]);
-    selected_object.polarization.Ey.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(14)]);
+    selected_object.polarization.Ey.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(11)]);
+    selected_object.polarization.Ey.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(12)]);
 
-    selected_object.jones_matrix.a.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(15)]);
-    selected_object.jones_matrix.a.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(16)]);
+    selected_object.jones_matrix.a.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(13)]);
+    selected_object.jones_matrix.a.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(14)]);
 
-    selected_object.jones_matrix.b.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(17)]);
-    selected_object.jones_matrix.b.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(18)]);
+    selected_object.jones_matrix.b.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(15)]);
+    selected_object.jones_matrix.b.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(16)]);
 
-    selected_object.jones_matrix.c.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(19)]);
-    selected_object.jones_matrix.c.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(20)]);
+    selected_object.jones_matrix.c.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(17)]);
+    selected_object.jones_matrix.c.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(18)]);
 
-    selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(21)]);
-    selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(22)]);
+    selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(19)]);
+    selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(20)]);
 
   // if we are checking this cube we definitely hit the cube objects
   if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
@@ -221,7 +218,61 @@ float object_hit_distance(uint object_index, RayObject ray) {
   }
 
   if (selected_object.type == SQUARE_WALL || selected_object.type == OPTICAL_OBJECT_SQUARE_WALL) {
+    vec3 a = rotate3dY(
+        rotate3dX(
+            vec3(
+                selected_object.center.x - selected_object.width, 
+                selected_object.center.y + selected_object.height, 
+                selected_object.center.z
+            ),
+            selected_object.rotation.x
+        ),
+        selected_object.rotation.y
+    );
 
+    vec3 b = rotate3dY(
+        rotate3dX(
+            vec3(
+                selected_object.center.x + selected_object.width, 
+                selected_object.center.y + selected_object.height, 
+                selected_object.center.z
+            ),
+            selected_object.rotation.x
+        ),
+        selected_object.rotation.y
+    );
+
+    vec3 c = rotate3dY(
+        rotate3dX(
+            vec3(
+                selected_object.center.x - selected_object.width, 
+                selected_object.center.y - selected_object.height, 
+                selected_object.center.z
+            ),
+            selected_object.rotation.x
+        ),
+        selected_object.rotation.y
+    );
+
+    vec3 d = rotate3dY(
+        rotate3dX(
+            vec3(
+                selected_object.center.x + selected_object.width, 
+                selected_object.center.y - selected_object.height, 
+                selected_object.center.z
+            ),
+            selected_object.rotation.x
+        ),
+        selected_object.rotation.y
+    );
+
+    float distance = length(quadIntersect(ray.pos, ray.dir, a, b, c, d));
+
+    if (distance < 0.4) {
+      return distance;
+    }
+
+    return -1.0;
   }
 
   if (selected_object.type == ROUND_WALL || selected_object.type == OPTICAL_OBJECT_ROUND_WALL) {
@@ -289,12 +340,6 @@ void iterateRayInDirection(inout RayObject ray) {
       return;
     }
 
-//    if (objects[current_index * uint(3)] == hashed_value && object_hit_distance(objects[(current_index * uint(3)) + uint(1)], ray)) {
-//      ray.object_hit = objects[current_index * uint(3) + uint(1)]; // key.val
-//      ray.ended_in_hit = true;
-//      return;
-//    }
-
     if ((ray.map_pos.x > 100 || ray.map_pos.x <= 0) || 
         (ray.map_pos.y > 100 || ray.map_pos.y <= 0) ||
         (ray.map_pos.z > 100 || ray.map_pos.z <= 0)
@@ -350,3 +395,4 @@ void main() {
     out_color = vec4(ray.color.x, ray_dir.y, ray_dir.z, 1.);
   }
 }
+

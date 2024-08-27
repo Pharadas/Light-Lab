@@ -1,4 +1,4 @@
-use math_vector::Vector;
+use nalgebra::Vector3;
 use web_sys::console;
 
 #[derive(Debug, Clone, Copy)]
@@ -13,11 +13,11 @@ pub struct GPUHashTable {
     pub buckets: Vec<u32>,
     pub objects: Vec<KeyValue>,
     objects_left: Vec<usize>, // should probably be a linked list as it will be acting as a stack
-    block_size: Vector<u32>,
+    block_size: Vector3<u32>,
 }
 
 impl GPUHashTable {
-    pub fn new(block_size: Vector<u32>) -> GPUHashTable {
+    pub fn new(block_size: Vector3<u32>) -> GPUHashTable {
         return GPUHashTable {
             buckets: vec![u32::MAX; 1000], // capacity hard coded for now
             objects: vec![KeyValue {key: 0, value: 0, next: u32::MAX}; 1000], // capacity hard coded for now
@@ -26,14 +26,14 @@ impl GPUHashTable {
         };
     }
 
-    fn hash(&self, val: Vector<u32>) -> u32 {
+    fn hash(&self, val: Vector3<u32>) -> u32 {
         // we reserve 0 as a free space
         return val.x + self.block_size.y * (val.y + self.block_size.z * val.z);
     }
 
     fn resize(&mut self) {} // TODO
 
-    pub fn insert(&mut self, key: Vector<u32>, val: u32)  {
+    pub fn insert(&mut self, key: Vector3<u32>, val: u32)  {
         // console::log_1(&self.objects_last.into());
 
         // if self.objects_last == 1000 {
@@ -84,7 +84,7 @@ impl GPUHashTable {
         console::log_2(&format!("{:?}", key).into(), &format!("{:?}", original_hash).into());
     }
 
-    pub fn remove(&mut self, key: Vector<u32>, val: u32) {
+    pub fn remove(&mut self, key: Vector3<u32>, val: u32) {
         let original_hash = self.hash(key);
         let index = (original_hash % 1000) as usize;
         let mut current_object: KeyValue;
