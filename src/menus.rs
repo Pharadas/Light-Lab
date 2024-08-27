@@ -142,12 +142,11 @@ impl MenusState {
             *selected_object_index = 0;
         }
 
-        if (
-            world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
-            world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
-            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
-            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
-        ) {
+        if world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
+           world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
+           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
+           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
+        {
             let mut shapes = vec![];
 
             ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));

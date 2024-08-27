@@ -117,6 +117,7 @@ pub struct WorldObject {
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
     pub center: [f32; 3],
+    pub color: [f32; 3],
     pub width: f32,
     pub height: f32,
     pub radius: f32,
@@ -133,7 +134,7 @@ enum Max {
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
-    pub objects: [WorldObject; 190],
+    pub objects: [WorldObject; 166],
     objects_stack: Vec<usize>,
     objects_associations: HashMap<usize, Vec<Vector3<u32>>>,
 }
@@ -203,8 +204,8 @@ impl World {
     pub fn new() -> World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
-            objects: [WorldObject::new(); 190],
-            objects_stack: (1..190).collect(),
+            objects: [WorldObject::new(); 166],
+            objects_stack: (1..166).collect(),
             objects_associations: HashMap::new()
         }
     }
@@ -341,6 +342,10 @@ impl World {
                 object.center[1].to_bits(),
                 object.center[2].to_bits(),
 
+                object.color[0].to_bits(),
+                object.color[1].to_bits(),
+                object.color[2].to_bits(),
+
                 object.width.to_bits(),
                 object.height.to_bits(),
 
@@ -375,6 +380,7 @@ impl WorldObject {
             rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
+            color: [0.0, 0.0, 0.0],
             width: 0.1,
             height: 0.1,
 

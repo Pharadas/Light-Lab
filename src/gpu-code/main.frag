@@ -29,7 +29,7 @@ const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using
 const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
 
-const uint OBJECT_SIZE = uint(21);
+const uint OBJECT_SIZE = uint(24);
 
 // Complex matrix =
 // |a b|
@@ -51,6 +51,7 @@ struct WorldObject {
   uint type;
   vec2 rotation;
   vec3 center;
+  vec3 color;
   float width;
   float height;
   // Will only be relevant if the object is a round wall
@@ -184,28 +185,32 @@ float object_hit_distance(uint object_index, RayObject ray) {
     selected_object.center.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(4)]);
     selected_object.center.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(5)]);
 
-    selected_object.width = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(6)]);
-    selected_object.height = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(7)]);
+    selected_object.color.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(6)]);
+    selected_object.color.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(7)]);
+    selected_object.color.z = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(8)]);
 
-    selected_object.radius = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(8)]);
+    selected_object.width = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(9)]);
+    selected_object.height = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(10)]);
 
-    selected_object.polarization.Ex.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(9)]);
-    selected_object.polarization.Ex.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(10)]);
+    selected_object.radius = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(11)]);
 
-    selected_object.polarization.Ey.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(11)]);
-    selected_object.polarization.Ey.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(12)]);
+    selected_object.polarization.Ex.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(12)]);
+    selected_object.polarization.Ex.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(13)]);
 
-    selected_object.jones_matrix.a.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(13)]);
-    selected_object.jones_matrix.a.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(14)]);
+    selected_object.polarization.Ey.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(14)]);
+    selected_object.polarization.Ey.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(15)]);
 
-    selected_object.jones_matrix.b.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(15)]);
-    selected_object.jones_matrix.b.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(16)]);
+    selected_object.jones_matrix.a.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(16)]);
+    selected_object.jones_matrix.a.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(17)]);
 
-    selected_object.jones_matrix.c.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(17)]);
-    selected_object.jones_matrix.c.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(18)]);
+    selected_object.jones_matrix.b.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(18)]);
+    selected_object.jones_matrix.b.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(19)]);
 
-    selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(19)]);
-    selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(20)]);
+    selected_object.jones_matrix.c.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(20)]);
+    selected_object.jones_matrix.c.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(21)]);
+
+    selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(22)]);
+    selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(23)]);
 
   // if we are checking this cube we definitely hit the cube objects
   if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
