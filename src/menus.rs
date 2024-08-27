@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{f32::consts::PI, ops::Deref};
 
 use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
@@ -134,18 +134,19 @@ impl MenusState {
         }
     }
 
-    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: usize) {
-        ui.add(Label::new(format!("{:?}", world.objects[selected_object_index])));
+    pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: &mut usize) {
+        ui.add(Label::new(format!("{:?}", world.objects[*selected_object_index])));
 
         if ui.add(Button::new("Remove object")).clicked() {
-            world.remove_object(selected_object_index);
+            world.remove_object(*selected_object_index);
+            *selected_object_index = 0;
         }
 
         let mut shapes = vec![];
 
-        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
-        ui.add(Slider::new(&mut world.objects[selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
-        ui.add(Slider::new(&mut world.objects[selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
 
         let response = Plot::new("rotation_plot")
         .allow_drag(false)
@@ -158,13 +159,13 @@ impl MenusState {
         .view_aspect(1.0)
         .show(ui, |plot_ui| {
             // vertical
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(world.objects[selected_object_index].rotation[0].abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(world.objects[*selected_object_index].rotation[0].abs(), 150.0), Stroke::new(1.0, Color32::BLUE)));
 
             // horizontal
-            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, world.objects[selected_object_index].rotation[1].abs()), Stroke::new(1.0, Color32::GREEN)));
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, world.objects[*selected_object_index].rotation[1].abs()), Stroke::new(1.0, Color32::GREEN)));
 
-            world.objects[selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 0.1;
-            world.objects[selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 0.1;
+            world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 0.1;
+            world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 0.1;
         }).response;
 
         ui.painter().with_clip_rect(response.rect).extend(shapes);

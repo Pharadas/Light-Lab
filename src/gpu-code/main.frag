@@ -9,7 +9,7 @@ uniform float time;
 
 uniform uint objects[3000];
 uniform uint buckets[1000];
-uniform uint objects_definitions[3000];
+uniform uint objects_definitions[4000];
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 object_found;
