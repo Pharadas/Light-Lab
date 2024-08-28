@@ -1,5 +1,5 @@
 use std::{collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}};
-use egui::TextBuffer;
+use egui::{Color32, TextBuffer};
 use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 use web_sys::console;
 use serde::{Deserialize, Serialize};
@@ -117,7 +117,7 @@ pub struct WorldObject {
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
     pub center: [f32; 3],
-    pub color: [f32; 3],
+    pub color: Color32,
     pub width: f32,
     pub height: f32,
     pub radius: f32,
@@ -342,9 +342,9 @@ impl World {
                 object.center[1].to_bits(),
                 object.center[2].to_bits(),
 
-                object.color[0].to_bits(),
-                object.color[1].to_bits(),
-                object.color[2].to_bits(),
+                (object.color.r() as f32 / 255.0).to_bits(),
+                (object.color.g() as f32 / 255.0).to_bits(),
+                (object.color.b() as f32 / 255.0).to_bits(),
 
                 object.width.to_bits(),
                 object.height.to_bits(),
@@ -380,7 +380,7 @@ impl WorldObject {
             rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
-            color: [0.0, 0.0, 0.0],
+            color: Color32::from_rgb(255, 0, 0),
             width: 0.1,
             height: 0.1,
 

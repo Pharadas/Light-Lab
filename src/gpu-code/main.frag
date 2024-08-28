@@ -341,6 +341,12 @@ void iterateRayInDirection(inout RayObject ray) {
 
     if (found_at_least_one_object) {
       ray.object_hit = objects[(closest_object_index * uint(3)) + uint(1)];
+
+      ray.color.x = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(6)]);
+      ray.color.y = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
+      ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
+      ray.color.a = 1.0;
+
       ray.ended_in_hit = true;
       return;
     }
@@ -356,7 +362,6 @@ void iterateRayInDirection(inout RayObject ray) {
       float h = 2.0 + checker(ray.current_real_position);
       ray.color *= vec4(h, h, h, 1);
 
-      ray.ended_in_hit = true;
       return;
     }
 
@@ -395,9 +400,9 @@ void main() {
   object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
 
   if (ray.ended_in_hit) {
-    out_color = vec4(vec3(ray.mask) * 0.2, 1.0) * ray.color;
+    out_color = ray.color;
   } else {
-    out_color = vec4(ray.color.x, ray_dir.y, ray_dir.z, 1.);
+    out_color = vec4(vec3(ray.mask) * 0.2, 1.0) * ray.color;
   }
 }
 

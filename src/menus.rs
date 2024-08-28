@@ -1,6 +1,6 @@
 use std::{f32::consts::PI, ops::Deref};
 
-use egui::{self, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
+use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
 use egui_plot::Plot;
@@ -178,6 +178,8 @@ impl MenusState {
 
             ui.painter().with_clip_rect(response.rect).extend(shapes);
         }
+
+        color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
     }
 
     pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector3<f32>) {

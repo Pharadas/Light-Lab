@@ -516,6 +516,11 @@ impl MainGlowProgram {
                 self.currently_selected_object as u32
             );
 
+            gl.uniform_1_f32(
+                gl.get_uniform_location(self.present_program, "time").as_ref(),
+                time
+            );
+
             // console::log_1(&format!("{:?}", texture_resolution).into());
 
             gl.active_texture(glow::TEXTURE0);
