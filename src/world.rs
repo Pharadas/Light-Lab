@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}};
+use std::{cmp::max, collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}};
 use egui::{Color32, TextBuffer};
 use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 use web_sys::console;
@@ -254,69 +254,15 @@ impl World {
             ObjectType::OpticalObjectRoundWall |
             ObjectType::SquareWall             |
             ObjectType::OpticalObjectSquareWall => {
-                let a = rotate3d_y(
-                    rotate3d_x(
-                        Vector3::new(
-                            object_definition.center[0] - object_definition.width, 
-                            object_definition.center[1] + object_definition.height, 
-                            object_definition.center[2]
-                        ),
-                        object_definition.rotation[1]
-                    ),
-                    object_definition.rotation[0]
-                );
+                let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
+                let truncated_radius = object_definition.height.max(object_definition.width) as u32 + 1;
 
-                let b = rotate3d_y(
-                    rotate3d_x(
-                        Vector3::new(
-                            object_definition.center[0] + object_definition.width, 
-                            object_definition.center[1] + object_definition.height, 
-                            object_definition.center[2]
-                        ),
-                        object_definition.rotation[1]
-                    ),
-                    object_definition.rotation[0]
-                );
-
-                let c = rotate3d_y(
-                    rotate3d_x(
-                        Vector3::new(
-                            object_definition.center[0] - object_definition.width, 
-                            object_definition.center[1] - object_definition.height, 
-                            object_definition.center[2]
-                        ),
-                        object_definition.rotation[1]
-                    ),
-                    object_definition.rotation[0]
-                );
-
-                let d = rotate3d_y(
-                    rotate3d_x(
-                        Vector3::new(
-                            object_definition.center[0] + object_definition.width, 
-                            object_definition.center[1] - object_definition.height, 
-                            object_definition.center[2]
-                        ),
-                        object_definition.rotation[1]
-                    ),
-                    object_definition.rotation[0]
-                );
-
-                // rasterize(b -> c).extend(rasterize(c -> d))
-                let mut path_to_search_rasterized = raymarch(to_f64_slice(b), to_f64_slice(c - b), to_f64_slice(c), Max::Steps(50));
-                path_to_search_rasterized.extend(raymarch(to_f64_slice(c), to_f64_slice(d - c), to_f64_slice(d), Max::Steps(50)));
-
-                for position in path_to_search_rasterized {
-                    self.hash_map.insert(i32_to_u32_vec(position + Vector3::new(100, 100, 100)), available_index as u32);
-                    object_positions.push(i32_to_u32_vec(position + Vector3::new(100, 100, 100)));
-                    // now just keep firing rays to every position and rasterizing
-                    let a_through_position_rasterized = raymarch(to_f64_slice(a), to_f64_slice(i32_to_f32_vec(position) - a), to_f64_slice(i32_to_f32_vec(position)), Max::Steps(50));
-                    // console::log_1(&format!("final list inside loop: {:?}", c_through_position_rasterized).into());
-
-                    // just put it into the grid
-                    for new_position in a_through_position_rasterized {
-                        self.hash_map.insert(i32_to_u32_vec(new_position + Vector3::new(100, 100, 100)), available_index as u32);
-                        object_positions.push(i32_to_u32_vec(new_position + Vector3::new(100, 100, 100)));
+                for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
+                    for y in (center[1] - truncated_radius)..=(center[1] + truncated_radius) {
+                        for z in (center[2] - truncated_radius)..=(center[2] + truncated_radius) {
+                            self.hash_map.insert(Vector3::new(x, y, z) + Vector3::new(100, 100, 100), available_index as u32);
+                            object_positions.push(Vector3::new(x, y, z) + Vector3::new(100, 100, 100));
+                        }
                     }
                 }
             }
@@ -381,10 +327,10 @@ impl WorldObject {
 
             center: [0.0, 0.0, 0.0],
             color: Color32::from_rgb(255, 0, 0),
-            width: 0.1,
-            height: 0.1,
+            width: 0.5,
+            height: 0.5,
 
-            radius: 0.0,
+            radius: 0.5,
 
             polarization: Polarization {
                 ex: Complex::new(0.0, 0.0),
