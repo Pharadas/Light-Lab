@@ -149,8 +149,8 @@ impl MenusState {
         {
             let mut shapes = vec![];
 
-            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], 0.0..=2.0*PI).text("X rotation"));
-            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], 0.0..=2.0*PI).text("Y rotation"));
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], (-PI / 2.0)..=(PI / 2.0)).text("X rotation"));
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], (-PI / 2.0)..=(PI / 2.0)).text("Y rotation"));
             ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
 
             let response = Plot::new("rotation_plot")
@@ -164,16 +164,16 @@ impl MenusState {
             .view_aspect(1.0)
             .show(ui, |plot_ui| {
                 // vertical
-                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new((world.objects[*selected_object_index].rotation[0].abs() * 150.0) / (2.0 * PI), 150.0), Stroke::new(1.0, Color32::BLUE)));
+                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new((world.objects[*selected_object_index].rotation[0].abs() * 150.0) / (PI / 2.0), 150.0), Stroke::new(1.0, Color32::BLUE)));
 
                 // horizontal
-                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, (world.objects[*selected_object_index].rotation[1].abs() * 150.0) / (2.0 * PI)), Stroke::new(1.0, Color32::GREEN)));
+                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, (world.objects[*selected_object_index].rotation[1].abs() * 150.0) / (PI / 2.0)), Stroke::new(1.0, Color32::GREEN)));
 
                 world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 2.0;
                 world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 2.0;
 
-                world.objects[*selected_object_index].rotation[0] = world.objects[*selected_object_index].rotation[0].clamp(0.0, 2.0 * PI);
-                world.objects[*selected_object_index].rotation[1] = world.objects[*selected_object_index].rotation[1].clamp(0.0, 2.0 * PI);
+                world.objects[*selected_object_index].rotation[0] = world.objects[*selected_object_index].rotation[0].clamp(-PI / 2.0, PI / 2.0);
+                world.objects[*selected_object_index].rotation[1] = world.objects[*selected_object_index].rotation[1].clamp(-PI / 2.0, PI / 2.0);
             }).response;
 
             ui.painter().with_clip_rect(response.rect).extend(shapes);

@@ -323,7 +323,7 @@ impl WorldObject {
     pub fn new() -> WorldObject {
         return WorldObject {
             object_type: ObjectType::CubeWall,
-            rotation: [0.0, 0.0],
+            rotation: [0.0, PI / 2.0],
 
             center: [0.0, 0.0, 0.0],
             color: Color32::from_rgb(255, 0, 0),
