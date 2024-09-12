@@ -431,6 +431,16 @@ impl MainGlowProgram {
                 time
             );
 
+            gl.uniform_1_u32(
+                gl.get_uniform_location(self.main_image_program, "light_sources_count").as_ref(),
+                world.light_sources.len() as u32
+            );
+
+            gl.uniform_1_u32_slice(
+                gl.get_uniform_location(self.main_image_program, "light_positions").as_ref(),
+                &world.light_sources.as_slice()
+            );
+
             gl.uniform_1_u32_slice(
                 gl.get_uniform_location(self.main_image_program, "buckets").as_ref(),
                 &world.hash_map.buckets.as_slice()

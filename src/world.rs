@@ -1,4 +1,4 @@
-use std::{cmp::max, collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}};
+use std::{cmp::max, collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
 use egui::{Color32, TextBuffer};
 use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 use web_sys::console;
@@ -114,6 +114,7 @@ pub struct Polarization {
 
 #[derive(Debug, Clone, Copy)]
 pub struct WorldObject {
+    // should add a way of discerning between gaussian beams and other types of lights
     pub object_type: ObjectType,
     pub rotation: [f32; 2],
     pub center: [f32; 3],
@@ -135,6 +136,9 @@ enum Max {
 pub struct World {
     pub hash_map: GPUHashTable,
     pub objects: [WorldObject; 166],
+    // would be an array but i want to be able to use pop()
+    // to remove an item but keep the memory contiguous
+    pub light_sources: Vec<u32>,
     objects_stack: Vec<usize>,
     objects_associations: HashMap<usize, Vec<Vector3<u32>>>,
 }
@@ -205,6 +209,7 @@ impl World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
             objects: [WorldObject::new(); 166],
+            light_sources: vec![],
             objects_stack: (1..166).collect(),
             objects_associations: HashMap::new()
         }
@@ -225,7 +230,10 @@ impl World {
         self.objects_stack.push(object_index);
     }
 
+    // this should return an ok, in case the objects list is full and we can't add
+    // anything here
     pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) {
+        // this line should possibly return an ok
         let available_index = self.objects_stack.pop().unwrap();
         let mut object_positions = vec![];
 
@@ -248,6 +256,8 @@ impl World {
                         }
                     }
                 }
+
+                self.light_sources.push(available_index as u32);
             }
 
             ObjectType::RoundWall              |

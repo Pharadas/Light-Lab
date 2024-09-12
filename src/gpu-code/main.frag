@@ -6,9 +6,13 @@ uniform vec2 u_rotation;
 uniform vec3 position; 
 uniform vec2 viewport_dimensions;
 uniform float time;
+uniform uint light_sources_count;
 
+uniform uint lights_positions[166];
 uniform uint objects[3000];
 uniform uint buckets[1000];
+// to be able to use WorldObject objects_definitions[] i'd have to have
+// sent it in a compatible alignment, not doin that tho
 uniform uint objects_definitions[4000];
 
 layout(location = 0) out vec4 out_color;
@@ -123,56 +127,7 @@ uint hash(ivec3 val) {
   return uint(val.x + WORLD_SIZE.y * (val.y + WORLD_SIZE.z * val.z));
 }
 
-// Intersections code
-// Thanks to iq's https://www.shadertoy.com/view/XtlBDs
-// 0--b--3
-// |\
-// a c
-// |  \
-// 1    2
-//
-vec3 quadIntersect( in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2, in vec3 v3 ) {
-    // lets make v0 the origin
-    vec3 a = v1 - v0;
-    vec3 b = v3 - v0;
-    vec3 c = v2 - v0;
-    vec3 p = ro - v0;
-
-    // intersect plane
-    vec3 nor = cross(a,b);
-    float t = -dot(p,nor)/dot(rd,nor);
-    if( t<0.0 ) return vec3(-1.0);
-
-    // intersection point
-    return p + t*rd;
-}
-
-float raySphereIntersect(vec3 r0, vec3 rd, vec3 s0, float sr) {
-    // - r0: ray origin
-    // - rd: normalized ray direction
-    // - s0: sphere center
-    // - sr: sphere radius
-    // - Returns distance from r0 to first intersecion with sphere,
-    //   or -1.0 if no intersection.
-    float a = dot(rd, rd);
-    vec3 s0_r0 = r0 - s0;
-    float b = 2.0 * dot(rd, s0_r0);
-    float c = dot(s0_r0, s0_r0) - (sr * sr);
-    if (b*b - 4.0*a*c < 0.0) {
-        return -1.0;
-    }
-    return (-b - sqrt((b*b) - 4.0*a*c))/(2.0*a);
-}
-
-// Ray marching code
-void step_ray(inout RayObject ray) {
-  ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
-  ray.side_dist += vec3(ray.mask) * ray.delta_dist;
-  ray.map_pos += ivec3(vec3(ray.mask)) * ray.step;
-}
-
-// object_hit_distance() < 0 means that no object was hit
-float object_hit_distance(uint object_index, RayObject ray) {
+WorldObject get_object_at_index(uint object_index) {
   WorldObject selected_object;
     // this whole section could break shit,
     // should add a check here or before sending
@@ -212,16 +167,88 @@ float object_hit_distance(uint object_index, RayObject ray) {
     selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(22)]);
     selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(23)]);
 
+    return selected_object;
+}
+
+// Intersections code
+// Thanks to iq's https://www.shadertoy.com/view/XtlBDs
+// 0--b--3
+// |\
+// a c
+// |  \
+// 1    2
+//
+vec3 quadIntersect( in vec3 ro, in vec3 rd, in vec3 v0, in vec3 v1, in vec3 v2, in vec3 v3 ) {
+    // lets make v0 the origin
+    vec3 a = v1 - v0;
+    vec3 b = v3 - v0;
+    vec3 c = v2 - v0;
+    vec3 p = ro - v0;
+
+    // intersect plane
+    vec3 nor = cross(a,b);
+    float t = -dot(p,nor)/dot(rd,nor);
+    if( t<0.0 ) return vec3(-1.0);
+
+    // intersection point
+    return p + t*rd;
+}
+
+// s -> ray start, c -> sphere center, d -> ray direction, r -> sphere radius
+vec3 raySphereIntersectPos(vec3 s, vec3 c, vec3 d, float r) {
+  // Calculate ray start's offset from the sphere center
+  vec3 p = s - c;
+
+  float rSquared = r * r;
+  float p_d = dot(p, d);
+
+  // The sphere is behind or surrounding the start point.
+  if(p_d > 0.0 || dot(p, p) < rSquared) {
+    return vec3(-1.0);
+  }
+
+  // Flatten p into the plane passing through c perpendicular to the ray.
+  // This gives the closest approach of the ray to the center.
+  vec3 a = p - p_d * d;
+
+  float aSquared = dot(a, a);
+
+  // Closest approach is outside the sphere.
+  if(aSquared > rSquared) {
+    return vec3(-1.0);
+  }
+
+  // Calculate distance from plane where ray enters/exits the sphere.    
+  float h = sqrt(rSquared - aSquared);
+
+  // Calculate intersection point relative to sphere center.
+  vec3 i = a - h * d;
+
+  return c + i;
+}
+
+// Ray marching code
+void step_ray(inout RayObject ray) {
+  ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
+  ray.side_dist += vec3(ray.mask) * ray.delta_dist;
+  ray.map_pos += ivec3(vec3(ray.mask)) * ray.step;
+}
+
+// object_hit_distance() < 0 means that no object was hit
+// this will return the point in world-space where the object
+// was hit
+vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
   // if we are checking this cube we definitely hit the cube objects
   if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
-    return length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+    // return length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
   }
 
   // if we hit a sphere type, we have to do additional checks
   if (selected_object.type == LIGHT_SOURCE) {
-    return raySphereIntersect(ray.pos, ray.dir, selected_object.center, selected_object.radius);
+    return raySphereIntersectPos(ray.pos, selected_object.center, ray.dir, selected_object.radius);
   }
 
+  // TODO: FIX
   if (selected_object.type == SQUARE_WALL || selected_object.type == OPTICAL_OBJECT_SQUARE_WALL) {
     vec3 a = rotate3dY(
         rotate3dX(
@@ -274,10 +301,10 @@ float object_hit_distance(uint object_index, RayObject ray) {
     vec3 distance = quadIntersect(ray.pos, ray.dir, selected_object.center + a, selected_object.center + b, selected_object.center + c, selected_object.center + d);
 
     if (abs(distance.x) < selected_object.width) {
-      return length(distance);
+      // return distance;
     }
 
-    return -1.0;
+    // return -1.0;
   }
 
   if (selected_object.type == ROUND_WALL || selected_object.type == OPTICAL_OBJECT_ROUND_WALL) {
@@ -329,17 +356,16 @@ float object_hit_distance(uint object_index, RayObject ray) {
         selected_object.rotation.x
     );
 
-    float distance = length(quadIntersect(ray.pos, ray.dir, selected_object.center, selected_object.center + b, selected_object.center + c, selected_object.center + d));
+    vec3 hit_pos_object_space = quadIntersect(ray.pos, ray.dir, selected_object.center, selected_object.center + b, selected_object.center + c, selected_object.center + d);
 
-    if (distance < selected_object.radius * 2.0) {
-      return distance;
+    if (length(hit_pos_object_space) < selected_object.radius * 2.0) {
+      return hit_pos_object_space + selected_object.center;
     }
 
-    return -1.0;
-
+    return vec3(-1.0);
   }
 
-  return -1.0;
+  return vec3(-1.0);
 }
 
 // the ray will simply iterate over the space in the direction it's facing trying to hit a 'solid' object
@@ -361,12 +387,14 @@ void iterateRayInDirection(inout RayObject ray) {
     // search the item in the "linked list" and save the closest one
     while (current_index != U32_MAX) {
       if (objects[current_index * uint(3)] == hashed_value) {
-        float distance_traveled = object_hit_distance(objects[(current_index * uint(3)) + uint(1)], ray);
+        WorldObject object = get_object_at_index(objects[(current_index * uint(3)) + uint(1)]);
+        vec3 pos_hit = object_hit_distance(object, ray);
+        float curr_distance_traveled = length(pos_hit - ray.pos);
 
-        if (distance_traveled > 0.0 && distance_traveled < min_distance) {
+        if (all(greaterThan(pos_hit, vec3(-0.5))) && curr_distance_traveled < min_distance) {
           found_at_least_one_object = true;
           closest_object_index = current_index;
-          min_distance = distance_traveled;
+          min_distance = curr_distance_traveled;
         }
       }
 
@@ -380,6 +408,8 @@ void iterateRayInDirection(inout RayObject ray) {
       ray.color.y = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
       ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
       ray.color.a = 1.0;
+
+      ray.color.xyz = ray.color.xyz * (1.0 / min_distance);
 
       ray.ended_in_hit = true;
       return;
@@ -427,9 +457,25 @@ void main() {
     ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.ended_in_hit = false;
-    // ray.optical_objects_through_which_it_passed = 0;
 
   iterateRayInDirection(ray);
+
+//  if (ray.ended_in_hit) {
+//    for (uint light_source_index = uint(0); light_source_index < light_sources_count; light_source_index++) {
+//      // point ray to light_source
+//      ray.dir = ray_dir;
+//      ray.pos = position;
+//      ray.map_pos = ivec3(ray.pos);
+//      ray.delta_dist = 1.0 / abs(ray.dir);
+//      ray.step = ivec3(sign(ray.dir));
+//      ray.side_dist = (sign(ray.dir) * (vec3(ray.map_pos) - ray.pos) + (sign(ray.dir) * 0.5) + 0.5) * ray.delta_dist;
+//      ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
+//      ray.color = vec4(1.0);
+//      ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+//      ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+//      ray.ended_in_hit = false;
+//    }
+//  }
 
   object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
 
@@ -439,4 +485,3 @@ void main() {
     out_color = vec4(vec3(ray.mask) * 0.2, 1.0) * ray.color;
   }
 }
-
