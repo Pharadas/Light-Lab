@@ -71,6 +71,8 @@ impl MenusState {
             });
         });
 
+        ui.add(Label::new(format!("{:?}", world.light_sources)));
+
         TableBuilder::new(ui)
             .column(Column::auto().resizable(true))
             .column(Column::remainder())

@@ -224,10 +224,18 @@ impl World {
             }
         }
 
+        for i in 0..self.light_sources.len() {
+            if self.light_sources[i] == object_index as u32 {
+                self.light_sources.remove(i);
+                break;
+            }
+        }
+
         // we must also remove it from the objects list
         // and mark that space as available
         self.objects[object_index] = WorldObject::new();
         self.objects_stack.push(object_index);
+
     }
 
     // this should return an ok, in case the objects list is full and we can't add

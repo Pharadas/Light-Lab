@@ -437,7 +437,7 @@ impl MainGlowProgram {
             );
 
             gl.uniform_1_u32_slice(
-                gl.get_uniform_location(self.main_image_program, "light_positions").as_ref(),
+                gl.get_uniform_location(self.main_image_program, "lights_definitions_indices").as_ref(),
                 &world.light_sources.as_slice()
             );
 

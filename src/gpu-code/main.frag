@@ -8,7 +8,7 @@ uniform vec2 viewport_dimensions;
 uniform float time;
 uniform uint light_sources_count;
 
-uniform uint lights_positions[166];
+uniform uint lights_definitions_indices[166];
 uniform uint objects[3000];
 uniform uint buckets[1000];
 // to be able to use WorldObject objects_definitions[] i'd have to have
@@ -94,6 +94,12 @@ struct RayObject {
   uint object_hit;
   // Complex2x2Matrix optical_objects_found_product;
   // int optical_objects_through_which_it_passed;
+};
+
+struct ObjectGoal {
+  WorldObject goal;
+  uint goal_index;
+  bool has_goal;
 };
 
 // Math utils functions =================================
@@ -240,7 +246,7 @@ void step_ray(inout RayObject ray) {
 vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
   // if we are checking this cube we definitely hit the cube objects
   if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
-    // return length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+    return ray.pos + (ray.dir * vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
   }
 
   // if we hit a sphere type, we have to do additional checks
@@ -374,8 +380,10 @@ vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
 // Mirrors: will bounce off the mirror and continue iterating
 // Light source: will stop
 // Optical Object: will multiply it's internal jones matrix and continue iterating
-void iterateRayInDirection(inout RayObject ray) {
+bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
   for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
+    step_ray(ray);
+
     uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
     uint original_index = hashed_value % uint(1000);
     uint current_index = buckets[original_index];
@@ -403,34 +411,58 @@ void iterateRayInDirection(inout RayObject ray) {
 
     if (found_at_least_one_object) {
       ray.object_hit = objects[(closest_object_index * uint(3)) + uint(1)];
+      ray.distance_traveled = min_distance;
+      ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
+
+      WorldObject object_hit = get_object_at_index(ray.object_hit);
+
+      // if we had a goal then check if we hit it
+      if (current_goal.has_goal) {
+        if (ray.object_hit == current_goal.goal_index) {
+          ray.color.xyz *= 50.0 / ray.distance_traveled;
+          ray.color.xyz *= object_hit.color;
+          return true;
+        }
+
+        // didn't hit whatever we were aiming for
+        // ray.color.xyz *= 30.0 / ray.distance_traveled;
+        // ray.color.xyz *= object_hit.color;
+        ray.color.xyz *= 0.1;
+
+        return false;
+      }
 
       ray.color.x = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(6)]);
       ray.color.y = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
       ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
       ray.color.a = 1.0;
 
-      ray.color.xyz = ray.color.xyz * (1.0 / min_distance);
+      ray.pos = ray.dir * min_distance;
 
       ray.ended_in_hit = true;
-      return;
+
+      return true;
     }
 
-    if ((ray.map_pos.x > 100 || ray.map_pos.x <= 0) || 
-        (ray.map_pos.y > 100 || ray.map_pos.y <= 0) ||
-        (ray.map_pos.z > 100 || ray.map_pos.z <= 0)
+    if ((ray.map_pos.x > 100 || ray.map_pos.x <= 1) || 
+        (ray.map_pos.y > 100 || ray.map_pos.y <= 1) ||
+        (ray.map_pos.z > 100 || ray.map_pos.z <= 1)
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
       ray.object_hit = uint(0);
+      ray.ended_in_hit = true;
+      ray.color = vec4(vec3(ray.mask) * 0.2, 1.0) + vec4(0.05);
 
       float h = 2.0 + checker(ray.current_real_position);
       ray.color *= vec4(h, h, h, 1);
 
-      return;
+      return false;
     }
-
-    step_ray(ray);
   }
+
+  // should be unreachable
+  return false;
 }
 
 void main() {
@@ -458,30 +490,45 @@ void main() {
     ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.ended_in_hit = false;
 
-  iterateRayInDirection(ray);
+  ObjectGoal empty_goal;
+    empty_goal.has_goal = false;
 
-//  if (ray.ended_in_hit) {
-//    for (uint light_source_index = uint(0); light_source_index < light_sources_count; light_source_index++) {
-//      // point ray to light_source
-//      ray.dir = ray_dir;
-//      ray.pos = position;
-//      ray.map_pos = ivec3(ray.pos);
-//      ray.delta_dist = 1.0 / abs(ray.dir);
-//      ray.step = ivec3(sign(ray.dir));
-//      ray.side_dist = (sign(ray.dir) * (vec3(ray.map_pos) - ray.pos) + (sign(ray.dir) * 0.5) + 0.5) * ray.delta_dist;
-//      ray.mask = lessThanEqual(ray.side_dist.xyz, min(ray.side_dist.yzx, ray.side_dist.zxy));
-//      ray.color = vec4(1.0);
-//      ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
-//      ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
-//      ray.ended_in_hit = false;
-//    }
-//  }
+  // walls are not valid objects
+  bool hit_valid_object = iterateRayInDirection(ray, empty_goal);
+
+  WorldObject object_hit = get_object_at_index(ray.object_hit);
 
   object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
 
-  if (ray.ended_in_hit) {
-    out_color = ray.color;
-  } else {
-    out_color = vec4(vec3(ray.mask) * 0.2, 1.0) * ray.color;
+  if (ray.ended_in_hit && object_hit.type != LIGHT_SOURCE) {
+    for (uint light_source_index = uint(0); light_source_index < light_sources_count; light_source_index++) {
+      WorldObject light_object = get_object_at_index(lights_definitions_indices[light_source_index]);
+
+      ObjectGoal light_source_goal;
+        light_source_goal.goal = light_object;
+        light_source_goal.goal_index = lights_definitions_indices[light_source_index];
+        light_source_goal.has_goal = true;
+
+      RayObject bounced = ray;
+        bounced.pos = bounced.current_real_position;
+
+        // point ray to light_source
+        bounced.dir = normalize(light_object.center - bounced.current_real_position);
+        // bounced.dir = normalize(bounced.pos - light_object.center);
+
+        bounced.map_pos = ivec3(bounced.pos);
+        bounced.delta_dist = 1.0 / abs(bounced.dir);
+        bounced.step = ivec3(sign(bounced.dir));
+        bounced.side_dist = (sign(bounced.dir) * (vec3(bounced.map_pos) - bounced.pos) + (sign(bounced.dir) * 0.5) + 0.5) * bounced.delta_dist;
+        bounced.mask = lessThanEqual(bounced.side_dist.xyz, min(bounced.side_dist.yzx, bounced.side_dist.zxy));
+        bounced.ended_in_hit = false;
+
+      iterateRayInDirection(bounced, light_source_goal);
+
+      ray.color.xyz *= bounced.color.xyz;
+      // ray.color.xyz = ray.dir;
+    }
   }
+
+  out_color = ray.color;
 }
