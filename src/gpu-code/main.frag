@@ -394,7 +394,7 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
 
     // search the item in the "linked list" and save the closest one
     while (current_index != U32_MAX) {
-      if (objects[current_index * uint(3)] == hashed_value) {
+      if ((objects[current_index * uint(3)] == hashed_value) && (objects[(current_index * uint(3)) + uint(1)] != ray.object_hit)) {
         WorldObject object = get_object_at_index(objects[(current_index * uint(3)) + uint(1)]);
         vec3 pos_hit = object_hit_distance(object, ray);
         float curr_distance_traveled = length(pos_hit - ray.pos);
@@ -489,6 +489,7 @@ void main() {
     ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.ended_in_hit = false;
+    ray.object_hit = U32_MAX;
 
   ObjectGoal empty_goal;
     empty_goal.has_goal = false;
@@ -514,7 +515,6 @@ void main() {
 
         // point ray to light_source
         bounced.dir = normalize(light_object.center - bounced.current_real_position);
-        // bounced.dir = normalize(bounced.pos - light_object.center);
 
         bounced.map_pos = ivec3(bounced.pos);
         bounced.delta_dist = 1.0 / abs(bounced.dir);
