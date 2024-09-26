@@ -147,7 +147,8 @@ impl MenusState {
         if world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
            world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
+           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall ||
+           world.objects[*selected_object_index].object_type == ObjectType::LightSource
         {
             let mut shapes = vec![];
 

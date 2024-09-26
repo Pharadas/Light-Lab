@@ -419,15 +419,13 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       // if we had a goal then check if we hit it
       if (current_goal.has_goal) {
         if (ray.object_hit == current_goal.goal_index) {
-          ray.color.xyz *= 50.0 / ray.distance_traveled;
+          ray.color.xyz *= 10.0 / ray.distance_traveled;
           ray.color.xyz *= object_hit.color;
           return true;
         }
 
         // didn't hit whatever we were aiming for
-        // ray.color.xyz *= 30.0 / ray.distance_traveled;
-        // ray.color.xyz *= object_hit.color;
-        ray.color.xyz *= 0.1;
+        ray.color.xyz *= 0.05;
 
         return false;
       }
@@ -437,7 +435,7 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
       ray.color.a = 1.0;
 
-      ray.pos = ray.dir * min_distance;
+      // ray.current_real_position = ray.dir * min_distance;
 
       ray.ended_in_hit = true;
 
@@ -510,23 +508,48 @@ void main() {
         light_source_goal.goal_index = lights_definitions_indices[light_source_index];
         light_source_goal.has_goal = true;
 
-      RayObject bounced = ray;
-        bounced.pos = bounced.current_real_position;
+      bool ray_facing_light = true;
 
-        // point ray to light_source
-        bounced.dir = normalize(light_object.center - bounced.current_real_position);
+      // before we try reaching the light, we should check if we can
+      // hit it without crossing the object we already hit
+      // we won't be doing this for optical objects
+      if (object_hit.type == ROUND_WALL) {
+        vec3 wall_normal = rotate3dY(rotate3dX(vec3(0.0, 1.0, 0.0), object_hit.rotation.y), object_hit.rotation.x);
+        float past_plane_product_light = dot(wall_normal, light_object.center - object_hit.center);
+        float past_plane_product_ray = dot(wall_normal, ray.pos - object_hit.center);
 
-        bounced.map_pos = ivec3(bounced.pos);
-        bounced.delta_dist = 1.0 / abs(bounced.dir);
-        bounced.step = ivec3(sign(bounced.dir));
-        bounced.side_dist = (sign(bounced.dir) * (vec3(bounced.map_pos) - bounced.pos) + (sign(bounced.dir) * 0.5) + 0.5) * bounced.delta_dist;
-        bounced.mask = lessThanEqual(bounced.side_dist.xyz, min(bounced.side_dist.yzx, bounced.side_dist.zxy));
-        bounced.ended_in_hit = false;
+        if ((past_plane_product_light > 0.0 && past_plane_product_ray < 0.0) || (past_plane_product_light < 0.0 && past_plane_product_ray > 0.0)) {
+          out_color = vec4(0.0, 0.0, 0.0, 1.0);
+          ray_facing_light = false;
+          return;
+        }
 
-      iterateRayInDirection(bounced, light_source_goal);
+      } else if (object_hit.type == CUBE_WALL) {
+        if (dot(vec3(ray.map_pos) - light_object.center, vec3(ray.mask) * -ray.dir) > 0.0) {
+          out_color = vec4(0.0, 0.0, 0.0, 1.0);
+          ray_facing_light = false;
+          return;
+        }
+      }
 
-      ray.color.xyz *= bounced.color.xyz;
-      // ray.color.xyz = ray.dir;
+      if (ray_facing_light) {
+        RayObject bounced = ray;
+          bounced.pos = bounced.current_real_position;
+
+          // point ray to light_source
+          bounced.dir = normalize(light_object.center - bounced.current_real_position);
+
+          bounced.map_pos = ivec3(bounced.pos);
+          bounced.delta_dist = 1.0 / abs(bounced.dir);
+          bounced.step = ivec3(sign(bounced.dir));
+          bounced.side_dist = (sign(bounced.dir) * (vec3(bounced.map_pos) - bounced.pos) + (sign(bounced.dir) * 0.5) + 0.5) * bounced.delta_dist;
+          bounced.mask = lessThanEqual(bounced.side_dist.xyz, min(bounced.side_dist.yzx, bounced.side_dist.zxy));
+          bounced.ended_in_hit = false;
+
+        iterateRayInDirection(bounced, light_source_goal);
+
+        ray.color.xyz *= bounced.color.xyz;
+      }
     }
   }
 
