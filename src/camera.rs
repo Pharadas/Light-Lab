@@ -36,7 +36,7 @@ impl Camera {
     pub fn new() -> Camera {
         return Camera {
             look_direction: Vec2::new(0.0, 0.0),
-            position: Vector3::new(50., 50., 50.),
+            position: Vector3::new(10., 10., 10.),
             up: Vector3::new(0.0, 1.0, 0.0)
         }
     }

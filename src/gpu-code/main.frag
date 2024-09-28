@@ -246,7 +246,8 @@ void step_ray(inout RayObject ray) {
 vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
   // if we are checking this cube we definitely hit the cube objects
   if (selected_object.type == CUBE_WALL || selected_object.type == OPTICAL_OBJECT_CUBE) {
-    return ray.pos + (ray.dir * vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+    float distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+    return vec3(ray.map_pos) - ray.dir * distance_traveled;
   }
 
   // if we hit a sphere type, we have to do additional checks
@@ -363,6 +364,7 @@ vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
     );
 
     vec3 hit_pos_object_space = quadIntersect(ray.pos, ray.dir, selected_object.center, selected_object.center + b, selected_object.center + c, selected_object.center + d);
+    float past_plane_product_ray = dot(ray.dir, hit_pos_object_space - ray.pos);
 
     if (length(hit_pos_object_space) < selected_object.radius * 2.0) {
       return hit_pos_object_space + selected_object.center;
@@ -393,6 +395,7 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
     uint closest_object_index = uint(0);
 
     // search the item in the "linked list" and save the closest one
+    // a.k.a the first one we would hit
     while (current_index != U32_MAX) {
       if ((objects[current_index * uint(3)] == hashed_value) && (objects[(current_index * uint(3)) + uint(1)] != ray.object_hit)) {
         WorldObject object = get_object_at_index(objects[(current_index * uint(3)) + uint(1)]);
@@ -435,16 +438,14 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
       ray.color.a = 1.0;
 
-      // ray.current_real_position = ray.dir * min_distance;
-
       ray.ended_in_hit = true;
 
       return true;
     }
 
-    if ((ray.map_pos.x > 100 || ray.map_pos.x <= 1) || 
-        (ray.map_pos.y > 100 || ray.map_pos.y <= 1) ||
-        (ray.map_pos.z > 100 || ray.map_pos.z <= 1)
+    if ((ray.map_pos.x > 20 || ray.map_pos.x <= 1) || 
+        (ray.map_pos.y > 20 || ray.map_pos.y <= 1) ||
+        (ray.map_pos.z > 20 || ray.map_pos.z <= 1)
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
@@ -534,7 +535,7 @@ void main() {
 
       if (ray_facing_light) {
         RayObject bounced = ray;
-          bounced.pos = bounced.current_real_position;
+          bounced.pos = ray.current_real_position;
 
           // point ray to light_source
           bounced.dir = normalize(light_object.center - bounced.current_real_position);
@@ -548,7 +549,7 @@ void main() {
 
         iterateRayInDirection(bounced, light_source_goal);
 
-        ray.color.xyz *= bounced.color.xyz;
+        ray.color.xyz = bounced.color.xyz;
       }
     }
   }

@@ -4,14 +4,16 @@ use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
 use egui_plot::Plot;
-use nalgebra::{RealField, Vector3};
+use nalgebra::{RealField, Vector2, Vector3};
 use web_sys::console;
 
-use crate::{app::MainGlowProgram, world::{ObjectType, PolarizerType, World, WorldObject}};
+use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
     pub selected_object: Option<WorldObject>,
     selected_polarizer_type: PolarizerType,
+    selected_light_polarization: LightPolarizationType,
+    selected_color: Color32,
     angle: f32,
     relative_phase_retardation: f32,
     circularity: f32,
@@ -48,6 +50,8 @@ impl MenusState {
         return MenusState {
             selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
+            selected_color: Color32::from_rgb(178, 127, 127),
+            selected_light_polarization: LightPolarizationType::NotPolarized,
             angle: 0f32,
             relative_phase_retardation: 0f32,
             circularity: 0f32,
@@ -147,14 +151,12 @@ impl MenusState {
         if world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
            world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
            world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::LightSource
+           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
         {
             let mut shapes = vec![];
 
             ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], (-PI / 2.0)..=(PI / 2.0)).text("X rotation"));
             ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], (-PI / 2.0)..=(PI / 2.0)).text("Y rotation"));
-            ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.0..=2.0*PI).text("Radius"));
 
             let response = Plot::new("rotation_plot")
             .allow_drag(false)
@@ -185,7 +187,7 @@ impl MenusState {
         color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
     }
 
-    pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: &Vector3<f32>) {
+    pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: Vector3<f32>, viewer_look_at_direction: Vector2<f32>) {
         egui::ComboBox::from_label("Polarizer/Phase retarder")
             .selected_text(format!("{}", self.object_creation_state.object_type))
             .show_ui(ui, |ui| {
@@ -201,10 +203,76 @@ impl MenusState {
 
         ui.add_space(10.0);
 
+        color_picker_color32(ui, &mut self.selected_color, egui::color_picker::Alpha::Opaque);
+
+        ui.add_space(10.0);
+
         match self.object_creation_state.object_type {
             ObjectType::LightSource => {
                 self.object_creation_state.center = [viewer_position.x, viewer_position.y, viewer_position.z];
-                self.object_creation_state.radius = 0.5;
+                self.object_creation_state.radius = 0.1;
+
+                egui::ComboBox::from_label("Light source polarization")
+                    .selected_text(format!("{}", self.selected_light_polarization))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearHorizontal, "Linear horizontal");
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearVertical, "Linear vertical");
+
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearDiagonal, "Linear rotated 45 degrees");
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearAntiDiagonal, "Linear rotated -45 degrees");
+
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::CircularRightHand, "Right circular");
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::CircularLeftHand, "Left circular");
+
+                        ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::NotPolarized, "Not polarized");
+                    }
+                );
+
+                // TODO: add new images at the end of this array and just add 12 to the value
+                let curr_image = &self.raw_images[self.selected_light_polarization as usize];
+
+                self.image_texture.set(
+                    ColorImage::from_rgba_unmultiplied(self.image_sizes[self.selected_light_polarization as usize], &curr_image),
+                    TextureOptions::default(),
+                );
+
+                ui.add_space(10.0);
+
+                match self.selected_polarizer_type {
+                    PolarizerType::LinearTheta                   | 
+                    PolarizerType::QuarterWavePlateFastAxisTheta | 
+                    PolarizerType::HalfWavePlateFastAxisTheta    | 
+                    PolarizerType::HalfWavePlateRotatedTheta     => {
+                        ui.add(Slider::new(&mut self.angle, 0.0..=2.0*PI).text("θ"));
+                    }
+
+                    PolarizerType::GeneralWavePlateLinearRetarderTheta => {
+                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
+                        ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
+                    }
+
+                    PolarizerType::ArbitraryBirefringentMaterialTheta => {
+                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
+                        ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
+                        ui.add(Slider::new(&mut self.circularity, (-PI/2.0)..=(PI/2.0)).text("Circularity (φ)"));
+                    }
+
+                    _ => {}
+                }
+
+                self.object_creation_state.set_light_polarization(self.selected_light_polarization);
+
+                ui.add_space(10.0);
+
+                ui.add(
+                    egui::Image::new(&self.image_texture)
+                        .max_height(400.0)
+                        .max_width(500.0)
+                        // .fit_to_exact_size(egui::Vec2 { x: 500.0, y: 500.0 })
+                        // .maintain_aspect_ratio(true)
+                );
+
+                ui.add_space(10.0);
             }
 
             ObjectType::OpticalObjectCube       |
@@ -292,7 +360,18 @@ impl MenusState {
         }
 
         if ui.add(Button::new("Create object in your position")).clicked() {
-            world.insert_object(Vector3::from_vec(viewer_position.as_slice().into_iter().map(|x| *x as i32).collect()), self.object_creation_state.clone());
+            // we want to spawn the object a bit ahead from the viewer's look at direction
+            let mut ray_dir = Vector3::new(0.0, 0.0, 1.0);
+
+            ray_dir = rotate3d_x(ray_dir, viewer_look_at_direction.y);
+            ray_dir = rotate3d_y(ray_dir, viewer_look_at_direction.x);
+            ray_dir = ray_dir.normalize() * 2.0;
+
+            let create_object_position = viewer_position + ray_dir;
+            self.object_creation_state.center = [create_object_position[0], create_object_position[1], create_object_position[2]];
+            self.object_creation_state.color = self.selected_color;
+
+            world.insert_object(Vector3::from_vec(create_object_position.as_slice().into_iter().map(|x| *x as i32).collect()), self.object_creation_state.clone());
         }
     }
 }

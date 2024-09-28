@@ -1,7 +1,7 @@
 use std::{cmp::max, collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
 use egui::{Color32, TextBuffer};
-use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
-use web_sys::console;
+use nalgebra::{linalg, Complex, ComplexField, Matrix2, Vector2, Vector3};
+use web_sys::{console, js_sys::Math::sqrt};
 use serde::{Deserialize, Serialize};
 
 use crate::{gpu_hash::GPUHashTable, util::{f32_slice_to_u32_vec, i32_to_f32_vec, i32_to_u32_vec, to_f64_slice}};
@@ -57,6 +57,19 @@ impl Display for ObjectType {
 }
 
 #[derive(PartialEq, Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum LightPolarizationType {
+    LinearHorizontal = 0,
+    LinearVertical = 1,
+
+    LinearDiagonal = 2,
+    LinearAntiDiagonal = 3,
+
+    CircularRightHand = 4,
+    CircularLeftHand = 5,
+    NotPolarized = 6
+}
+
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum PolarizerType {
     LinearHorizontal = 0,
     LinearVertical = 1,
@@ -78,6 +91,25 @@ pub enum PolarizerType {
 
     ArbitraryBirefringentMaterialTheta = 12
 }
+
+// Needed for the drop down list
+impl Display for LightPolarizationType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LinearHorizontal => write!(f, "Linear horizontal"),
+            Self::LinearVertical => write!(f, "Linear vertical"),
+
+            Self::LinearDiagonal => write!(f, "Linear rotated 45 degrees"),
+            Self::LinearAntiDiagonal => write!(f, "Linear rotated θ degrees"),
+
+            Self::CircularRightHand => write!(f, "Right circular"),
+            Self::CircularLeftHand => write!(f, "Left circular"),
+
+            Self::NotPolarized => write!(f, "Not polarized")
+        }
+    }
+}
+
 
 // Needed for the drop down list
 impl Display for PolarizerType {
@@ -122,7 +154,7 @@ pub struct WorldObject {
     pub width: f32,
     pub height: f32,
     pub radius: f32,
-    pub polarization: Polarization,
+    pub polarization: Vector2<Complex<f32>>,
     pub jones_matrix: Matrix2<Complex<f32>>
 }
 
@@ -240,7 +272,7 @@ impl World {
 
     // this should return an ok, in case the objects list is full and we can't add
     // anything here
-    pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) {
+    pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) -> usize {
         // this line should possibly return an ok
         let available_index = self.objects_stack.pop().unwrap();
         let mut object_positions = vec![];
@@ -273,7 +305,7 @@ impl World {
             ObjectType::SquareWall             |
             ObjectType::OpticalObjectSquareWall => {
                 let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
-                let truncated_radius = object_definition.height.max(object_definition.width) as u32 + 1;
+                let truncated_radius = object_definition.radius as u32 + 1;
 
                 for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
                     for y in (center[1] - truncated_radius)..=(center[1] + truncated_radius) {
@@ -292,6 +324,7 @@ impl World {
         console::log_1(&format!("{:?}", available_index).into());
         self.objects_associations.insert(available_index, object_positions);
         self.objects[available_index] = object_definition;
+        return available_index;
     }
 
     pub fn get_gpu_compatible_world_objects_list(&self) -> Vec<u32> {
@@ -315,11 +348,11 @@ impl World {
 
                 object.radius.to_bits(),
 
-                object.polarization.ex.real().to_bits(),
-                object.polarization.ex.imaginary().to_bits(),
+                object.polarization[0].real().to_bits(),
+                object.polarization[0].imaginary().to_bits(),
 
-                object.polarization.ey.real().to_bits(),
-                object.polarization.ey.imaginary().to_bits(),
+                object.polarization[1].real().to_bits(),
+                object.polarization[1].imaginary().to_bits(),
 
                 object.jones_matrix[0].real().to_bits(),
                 object.jones_matrix[0].imaginary().to_bits(),
@@ -350,12 +383,40 @@ impl WorldObject {
 
             radius: 0.5,
 
-            polarization: Polarization {
-                ex: Complex::new(0.0, 0.0),
-                ey: Complex::new(0.0, 0.0)
+            polarization: Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)),
+            jones_matrix: Matrix2::zeros()
+        }
+    }
+
+    pub fn set_light_polarization(&mut self, type_of_object: LightPolarizationType) {
+        match type_of_object {
+            LightPolarizationType::NotPolarized => {
+                self.polarization = Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0))
             },
 
-            jones_matrix: Matrix2::zeros()
+            LightPolarizationType::LinearHorizontal => {
+                self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(0.0, 0.0))
+            },
+
+            LightPolarizationType::LinearVertical => {
+                self.polarization = Vector2::new(Complex::new(0.0, 0.0), Complex::new(1.0, 0.0))
+            },
+
+            LightPolarizationType::LinearDiagonal => {
+                self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(1.0, 0.0)).map(|x| x * (1.0 / (2.0).sqrt()));
+            },
+
+            LightPolarizationType::LinearAntiDiagonal => {
+                self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(-1.0, 0.0)).map(|x| x * (1.0 / (2.0).sqrt()));
+            },
+
+            LightPolarizationType::CircularRightHand => {
+                self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(0.0, -1.0)).map(|x| x * (1.0 / (2.0).sqrt()));
+            },
+
+            LightPolarizationType::CircularLeftHand => {
+                self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(0.0, 1.0)).map(|x| x * (1.0 / (2.0).sqrt()));
+            },
         }
     }
 

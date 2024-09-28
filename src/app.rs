@@ -6,6 +6,7 @@ use eframe::egui_glow;
 use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
 use egui_glow::glow;
 use image::RgbaImage;
+use nalgebra::Vector2;
 use web_sys::console;
 
 use crate::{camera::Camera, menus::MenusState, world::World};
@@ -113,7 +114,7 @@ impl eframe::App for MainApp {
                     }
 
                     egui::Window::new("Object creator").show(ctx, |ui| {
-                        self.menus.object_creation_menu(ui, &mut self.world, &self.camera.position);
+                        self.menus.object_creation_menu(ui, &mut self.world, self.camera.position, Vector2::new(self.camera.look_direction.x, self.camera.look_direction.y));
                     });
 
                     if self.menus.should_display_debug_menu {
