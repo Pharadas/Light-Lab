@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use eframe::egui_glow;
-use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
+use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, TextureOptions};
 use egui_glow::glow;
 use image::RgbaImage;
 use nalgebra::{Complex, Matrix2, Vector2, Vector3};

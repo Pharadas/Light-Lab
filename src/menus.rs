@@ -1,10 +1,10 @@
-use std::{f32::consts::PI, ops::Deref};
+use std::{f32::consts::PI};
 
 use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
 use egui_plot::{Line, Plot, PlotPoints};
-use nalgebra::{Complex, ComplexField, RealField, Vector2, Vector3};
+use nalgebra::{Complex, ComplexField, Vector2, Vector3};
 use web_sys::console;
 
 use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
@@ -276,30 +276,30 @@ impl MenusState {
                     }
                 );
 
-                // TODO: add new images at the end of this array and just add 12 to the value
-                let curr_image = &self.raw_images[self.selected_light_polarization as usize];
+                // // TODO: add new images at the end of this array and just add 12 to the value
+                // let curr_image = &self.raw_images[self.selected_light_polarization as usize];
 
-                self.image_texture.set(
-                    ColorImage::from_rgba_unmultiplied(self.image_sizes[self.selected_light_polarization as usize], &curr_image),
-                    TextureOptions::default(),
-                );
+                // self.image_texture.set(
+                //     ColorImage::from_rgba_unmultiplied(self.image_sizes[self.selected_light_polarization as usize], &curr_image),
+                //     TextureOptions::default(),
+                // );
 
                 ui.add_space(10.0);
 
                 self.object_creation_state.polarization_type = self.selected_light_polarization;
                 self.object_creation_state.set_light_polarization();
 
-                ui.add_space(10.0);
+                // ui.add_space(10.0);
 
-                ui.add(
-                    egui::Image::new(&self.image_texture)
-                        .max_height(400.0)
-                        .max_width(500.0)
-                        // .fit_to_exact_size(egui::Vec2 { x: 500.0, y: 500.0 })
-                        // .maintain_aspect_ratio(true)
-                );
+                // ui.add(
+                //     egui::Image::new(&self.image_texture)
+                //         .max_height(400.0)
+                //         .max_width(500.0)
+                //         // .fit_to_exact_size(egui::Vec2 { x: 500.0, y: 500.0 })
+                //         // .maintain_aspect_ratio(true)
+                // );
 
-                ui.add_space(10.0);
+                // ui.add_space(10.0);
             }
 
             ObjectType::OpticalObjectCube       |

@@ -6,7 +6,6 @@ use nalgebra::Vector3;
 pub struct Camera {
     pub look_direction: Vec2,
     pub position: Vector3<f32>,
-    up: Vector3<f32>
 }
 
 // maybe should move this to a math.rs module or something
@@ -37,7 +36,6 @@ impl Camera {
         return Camera {
             look_direction: Vec2::new(0.0, 0.0),
             position: Vector3::new(10., 10., 10.),
-            up: Vector3::new(0.0, 1.0, 0.0)
         }
     }
 

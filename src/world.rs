@@ -1,33 +1,10 @@
-use std::{cmp::max, collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
-use egui::{Color32, TextBuffer};
-use nalgebra::{linalg, Complex, ComplexField, Matrix2, Vector2, Vector3};
-use web_sys::{console, js_sys::Math::sqrt};
+use std::{collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
+use egui::Color32;
+use nalgebra::{Complex, ComplexField, Matrix2, Vector2, Vector3};
+use web_sys::console;
 use serde::{Deserialize, Serialize};
 
-use crate::{gpu_hash::GPUHashTable, util::{f32_slice_to_u32_vec, i32_to_f32_vec, i32_to_u32_vec, to_f64_slice}};
-
-// maybe should move this to a math.rs module or something
-pub fn rotate3d_y(v: Vector3<f32>, a: f32) -> Vector3<f32> {
-    let cos_a = a.cos();
-    let sin_a = a.sin();
-
-    return Vector3::new(
-        v.x * cos_a + v.z * sin_a,
-        v.y,
-        -v.x * sin_a + v.z * cos_a
-    );
-}
-
-pub fn rotate3d_x(v: Vector3<f32>, a: f32) -> Vector3<f32> {
-    let cos_a = a.cos();
-    let sin_a = a.sin();
-
-    return Vector3::new(
-        v.x,
-        v.y * cos_a - v.z * sin_a,
-        v.y * sin_a + v.z * cos_a
-    );
-}
+use crate::{gpu_hash::GPUHashTable, util::i32_to_u32_vec};
 
 // WorldObject.type possible values
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -139,12 +116,6 @@ impl Display for PolarizerType {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Polarization {
-    ex: Complex<f32>,
-    ey: Complex<f32>
-}
-
-#[derive(Debug, Clone, Copy)]
 pub struct WorldObject {
     // should add a way of discerning between gaussian beams and other types of lights
     pub object_type: ObjectType,
@@ -159,12 +130,6 @@ pub struct WorldObject {
     pub polarization_type: LightPolarizationType
 }
 
-#[derive(Copy, Clone)]
-enum Max {
-    Steps(usize),
-    Distance(f64),
-}
-
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
@@ -174,67 +139,6 @@ pub struct World {
     pub light_sources: Vec<u32>,
     objects_stack: Vec<usize>,
     objects_associations: HashMap<usize, Vec<Vector3<u32>>>,
-}
-
-// Thanks to https://github.com/leroycep/ascii-raycaster/blob/master/src/main.rs
-fn raymarch(pos: [f64; 3], dir: [f64; 3], end_pos: [f64; 3], max: Max) -> Vec<Vector3<i32>> {
-    let mut tiles_found: Vec<Vector3<i32>> = vec![];
-
-    let (max_steps, _max_distance) = match max {
-        Max::Steps(num) => (num, ::std::f64::INFINITY),
-        Max::Distance(dist) => (::std::usize::MAX, dist),
-    };
-    let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
-    let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
-    let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
-                      (dir2[0]/dir2[1] + 1.0             + dir2[2]/dir2[1]).sqrt(),
-                      (dir2[0]/dir2[2] + dir2[1]/dir2[2] + 1.0            ).sqrt(),
-    ];
-    console::log_1(&format!("{:?}", delta_dist).into());
-    let mut step = [0.0, 0.0, 0.0];
-    let mut side_dist = [0.0, 0.0, 0.0];
-    let mut _side;
-    for i in 0..3 {
-        if dir[i] < 0.0 {
-            step[i] = -1.0;
-            side_dist[i] = (pos[i] - map_pos[i]) * delta_dist[i];
-        } else {
-            step[i] = 1.0;
-            side_dist[i] = (map_pos[i] + 1.0 - pos[i]) * delta_dist[i];
-        }
-    }
-
-    let mut last_distance = (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude();
-
-    for _ in 0..max_steps {
-        if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
-            side_dist[0] += delta_dist[0];
-            map_pos[0] += step[0];
-            _side = 1;
-        } else if side_dist[1] < side_dist[2] {
-            side_dist[1] += delta_dist[1];
-            map_pos[1] += step[1];
-            _side = 3;
-        } else {
-            side_dist[2] += delta_dist[2];
-            map_pos[2] += step[2];
-            _side = 2;
-        }
-        tiles_found.push(Vector3::new(map_pos[0] as i32, map_pos[1] as i32, map_pos[2] as i32));
-
-        if (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude() > last_distance { // check that we are getting closer
-            console::log_1(&"exited ray caster when ray passed target".into());
-            return tiles_found;
-        }
-
-        last_distance = (Vector3::new(map_pos[0], map_pos[1], map_pos[2]) - Vector3::new(end_pos[0], end_pos[1], end_pos[2])).magnitude();
-
-        if map_pos[0] as i32 == end_pos[0] as i32 && map_pos[1] as i32 == end_pos[1] as i32 && map_pos[2] as i32 == end_pos[2] as i32 {
-            console::log_1(&"exited ray caster normally".into());
-            return tiles_found;
-        }
-    }
-    return tiles_found;
 }
 
 impl World {

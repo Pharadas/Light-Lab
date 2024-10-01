@@ -2,7 +2,6 @@ use std::u32;
 
 use nalgebra::Vector3;
 use web_sys::console;
-use std::error::Error;
 
 #[derive(Debug, Clone, Copy)]
 pub struct KeyValue {
