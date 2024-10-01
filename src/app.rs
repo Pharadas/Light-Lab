@@ -6,10 +6,10 @@ use eframe::egui_glow;
 use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, RichText, TextureOptions, Widget, WidgetText};
 use egui_glow::glow;
 use image::RgbaImage;
-use nalgebra::Vector2;
+use nalgebra::{Complex, Matrix2, Vector2, Vector3};
 use web_sys::console;
 
-use crate::{camera::Camera, menus::MenusState, world::World};
+use crate::{camera::Camera, menus::MenusState, world::{LightPolarizationType, ObjectType, World, WorldObject}};
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -75,9 +75,19 @@ impl MainApp {
             TextureOptions::default(),
         );
 
+        // load demo
+        let mut demo_world = World::new();
+        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal };
+        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal };
+        let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized };
+
+        demo_world.insert_object(Vector3::from_vec(demo_red_light.center.into_iter().map(|x| x as i32).collect()), demo_red_light);
+        demo_world.insert_object(Vector3::from_vec(demo_blue_light.center.into_iter().map(|x| x as i32).collect()), demo_blue_light);
+        demo_world.insert_object(Vector3::from_vec(demo_wall.center.into_iter().map(|x| x as i32).collect()), demo_wall);
+
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
-            world: World::new(),
+            world: demo_world,
             camera: Camera::new(),
             time: 0.0,
             menus: MenusState::new(screen_texture, debug_texture, all_images, image_sizes)
@@ -95,6 +105,8 @@ impl eframe::App for MainApp {
                     egui::Window::new("Main menu").show(ctx, |ui| {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"));
+
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.05..=3.0).text("Cube size in meters"));
 
                         if self.menus.should_display_debug_menu {
                             if ui.add(Button::new("Hide debug menu")).clicked() {
@@ -216,6 +228,7 @@ pub struct MainGlowProgram {
     pub current_texture_resolution: [i32; 2],
     pub objects_found: Vec<u8>,
     pub desired_scaling_factor: f32,
+    pub cube_scaling_factor: f32,
     pub currently_selected_object: usize
 }
 
@@ -360,6 +373,7 @@ impl MainGlowProgram {
                 current_texture_resolution: [0, 0],
                 objects_found: vec![0u8],
                 desired_scaling_factor: 0.25,
+                cube_scaling_factor: 3.0,
                 currently_selected_object: 0
             })
         }
@@ -430,6 +444,11 @@ impl MainGlowProgram {
             gl.uniform_1_f32(
                 gl.get_uniform_location(self.main_image_program, "time").as_ref(),
                 time
+            );
+
+            gl.uniform_1_f32(
+                gl.get_uniform_location(self.main_image_program, "cube_scaling_factor").as_ref(),
+                self.cube_scaling_factor
             );
 
             gl.uniform_1_u32(

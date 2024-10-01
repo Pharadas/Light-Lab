@@ -6,6 +6,7 @@ uniform vec2 u_rotation;
 uniform vec3 position; 
 uniform vec2 viewport_dimensions;
 uniform float time;
+uniform float cube_scaling_factor;
 uniform uint light_sources_count;
 
 uniform uint lights_definitions_indices[166];
@@ -123,9 +124,125 @@ vec3 rotate3dX(vec3 v, float a) {
     );
 }
 
+float computeDistance(vec3 A, vec3 B, vec3 C) {
+	float x = length(cross(B - A, C - A));
+	float y = length(B - A);
+	return x / y;
+}
+
 float checker(vec3 p) {
-  float t = 10.0;
+  float t = 1.0;
   return step(0.0, sin(PI * p.x + PI/t)*sin(PI *p.y + PI/t)*sin(PI *p.z + PI/t));
+}
+
+// Complex math utils functions ========================
+// Have to define it here because we may use it to define the phase retarder
+// Complex Number math by julesb
+// https://github.com/julesb/glsl-util
+// Additions by Johan Karlsson (DonKarlssonSan)
+
+vec2 cx_exp (vec2 z) {
+	return exp(z.x) * vec2(cos(z.y), sin(z.y));
+}
+
+#define cx_mul(a, b) vec2(a.x*b.x-a.y*b.y, a.x*b.y+a.y*b.x)
+#define cx_div(a, b) vec2(((a.x*b.x+a.y*b.y)/(b.x*b.x+b.y*b.y)),((a.y*b.x-a.x*b.y)/(b.x*b.x+b.y*b.y)))
+#define cx_modulus(a) length(a)
+#define cx_conj(a) vec2(a.x, -a.y)
+#define cx_arg(a) atan(a.y, a.x)
+#define cx_sin(a) vec2(sin(a.x) * cosh(a.y), cos(a.x) * sinh(a.y))
+#define cx_cos(a) vec2(cos(a.x) * cosh(a.y), -sin(a.x) * sinh(a.y))
+
+vec2 cx_sqrt(vec2 a) {
+  float r = length(a);
+  float rpart = sqrt(0.5*(r+a.x));
+  float ipart = sqrt(0.5*(r-a.x));
+  if (a.y < 0.0) ipart = -ipart;
+  return vec2(rpart,ipart);
+}
+
+vec2 cx_tan(vec2 a) {return cx_div(cx_sin(a), cx_cos(a)); }
+
+vec2 cx_log(vec2 a) {
+    float rpart = sqrt((a.x*a.x)+(a.y*a.y));
+    float ipart = atan(a.y,a.x);
+    if (ipart > PI) ipart=ipart-(2.0*PI);
+    return vec2(log(rpart),ipart);
+}
+
+vec2 cx_mobius(vec2 a) {
+    vec2 c1 = a - vec2(1.0,0.0);
+    vec2 c2 = a + vec2(1.0,0.0);
+    return cx_div(c1, c2);
+}
+
+vec2 cx_z_plus_one_over_z(vec2 a) {
+    return a + cx_div(vec2(1.0,0.0), a);
+}
+
+vec2 cx_z_squared_plus_c(vec2 z, vec2 c) {
+    return cx_mul(z, z) + c;
+}
+
+vec2 cx_sin_of_one_over_z(vec2 z) {
+    return cx_sin(cx_div(vec2(1.0,0.0), z));
+}
+
+////////////////////////////////////////////////////////////
+// end Complex Number math by julesb
+////////////////////////////////////////////////////////////
+
+// My own additions to complex number math
+#define cx_sub(a, b) vec2(a.x - b.x, a.y - b.y)
+#define cx_add(a, b) vec2(a.x + b.x, a.y + b.y)
+#define cx_abs(a) length(a)
+vec2 cx_to_polar(vec2 a) {
+    float phi = atan(a.y / a.x);
+    float r = length(a);
+    return vec2(r, phi); 
+}
+    
+// Complex power
+// Let z = r(cos θ + i sin θ)
+// Then z^n = r^n (cos nθ + i sin nθ)
+vec2 cx_pow(vec2 a, float n) {
+    float angle = atan(a.y, a.x);
+    float r = length(a);
+    float real = pow(r, n) * cos(n*angle);
+    float im = pow(r, n) * sin(n*angle);
+    return vec2(real, im);
+}
+
+// NOTE
+// matrix =
+// [a b
+//  c d]
+Complex2x2Matrix cx_2x2_mat_mul(Complex2x2Matrix A, Complex2x2Matrix B) {
+  Complex2x2Matrix resultant_mat;
+  resultant_mat.a = A.a * B.a + A.b * B.c;
+  resultant_mat.b = A.a * B.b + A.b * B.d;
+  resultant_mat.c = A.c * B.a + A.d * B.c;
+  resultant_mat.d = A.c * B.b + A.d * B.d;
+
+  return resultant_mat;
+}
+
+Complex2x2Matrix cx_scalar_x_2x2_mat_mul(vec2 cx_scalar, Complex2x2Matrix cx_mat) {
+  cx_mat.a = cx_mul(cx_scalar, cx_mat.a);
+  cx_mat.b = cx_mul(cx_scalar, cx_mat.b);
+  cx_mat.c = cx_mul(cx_scalar, cx_mat.c);
+  cx_mat.d = cx_mul(cx_scalar, cx_mat.d);
+
+  return cx_mat;
+}
+
+// TODO: maybe make a cx vec2 so that this is more general
+Polarization cx_2x2_mat_x_cx_pol_mul(Complex2x2Matrix mat, Polarization vec) {
+  Polarization result = Polarization(vec2(0, 0), vec2(0, 0));
+  result.Ex = cx_add(cx_mul(mat.a, vec.Ex), cx_mul(mat.b, vec.Ey));
+  result.Ey = cx_add(cx_mul(mat.c, vec.Ey), cx_mul(mat.d, vec.Ey));
+
+  return result;
 }
 
 // Hash implementation
@@ -376,6 +493,7 @@ vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
   return vec3(-1.0);
 }
 
+// TODO find a better name, it doesn't only iterate, it tries to reach a goal
 // the ray will simply iterate over the space in the direction it's facing trying to hit a 'solid' object
 // Walls: will stop
 // Models: will stop
@@ -402,7 +520,9 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
         vec3 pos_hit = object_hit_distance(object, ray);
         float curr_distance_traveled = length(pos_hit - ray.pos);
 
-        if (all(greaterThan(pos_hit, vec3(-0.5))) && curr_distance_traveled < min_distance) {
+        bool is_valid_collision_target = (!current_goal.has_goal) || (object.type != LIGHT_SOURCE) || (objects[(current_index * uint(3)) + uint(1)] == current_goal.goal_index);
+
+        if (all(greaterThan(pos_hit, vec3(-0.5))) && curr_distance_traveled < min_distance && is_valid_collision_target) {
           found_at_least_one_object = true;
           closest_object_index = current_index;
           min_distance = curr_distance_traveled;
@@ -422,7 +542,9 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       // if we had a goal then check if we hit it
       if (current_goal.has_goal) {
         if (ray.object_hit == current_goal.goal_index) {
-          ray.color.xyz *= 10.0 / ray.distance_traveled;
+          float virtual_distance_traveled = ray.distance_traveled * cube_scaling_factor;
+
+          ray.color.xyz *= 10.0 /(virtual_distance_traveled * virtual_distance_traveled);
           ray.color.xyz *= object_hit.color;
           return true;
         }
@@ -467,8 +589,8 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
 void main() {
   vec2 screen_pos = ((gl_FragCoord.xy / viewport_dimensions) * 2.) - 1.;
 
-  vec3 camera_dir = vec3(0.0, 0.0, 1.0);
-  vec3 camera_plane_u = vec3(1.0, 0.0, 0.0);
+  vec3 camera_dir = vec3(0.0, 0.0, 0.75);
+  vec3 camera_plane_u = vec3(1.25, 0.0, 0.0);
   vec3 camera_plane_v = vec3(0.0, 1.0, 0.0);
 
   vec3 ray_dir = camera_dir + screen_pos.x * camera_plane_u + screen_pos.y * camera_plane_v;
@@ -498,7 +620,13 @@ void main() {
 
   WorldObject object_hit = get_object_at_index(ray.object_hit);
 
+  if (light_sources_count != uint(0) && ray.object_hit == uint(0)) {
+    ray.color *= 0.05;
+  }
+
   object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
+  Polarization[166] lights_polarizations;
+  uint light_sources_hit = uint(0);
 
   if (ray.ended_in_hit && object_hit.type != LIGHT_SOURCE) {
     for (uint light_source_index = uint(0); light_source_index < light_sources_count; light_source_index++) {
@@ -547,10 +675,68 @@ void main() {
           bounced.mask = lessThanEqual(bounced.side_dist.xyz, min(bounced.side_dist.yzx, bounced.side_dist.zxy));
           bounced.ended_in_hit = false;
 
-        iterateRayInDirection(bounced, light_source_goal);
+        if (iterateRayInDirection(bounced, light_source_goal)) {
+          vec3 light_point_dir_x = rotate3dY(vec3(0.0, 0.0, 1.0), light_object.rotation.x);
+          vec3 light_point_dir_y = rotate3dX(vec3(0.0, -1.0, 0.0), light_object.rotation.y);
+          vec3 light_point_dir = normalize(light_point_dir_x + light_point_dir_y);
 
-        ray.color.xyz = bounced.color.xyz;
+          // virtual distance
+          float radius = computeDistance(light_object.center, light_object.center + light_point_dir, bounced.pos) * cube_scaling_factor;
+          float z = length(light_object.center - ray.current_real_position) * cube_scaling_factor;
+
+          // Gaussian beam definition
+          // TODO: this should also be part of some light definition
+          float wavelength = 1.0;
+          float w0 = 10.0 * cube_scaling_factor;
+          float n = 1.0;
+          float z_r = (PI * w0 * w0 * n) / wavelength;
+          float w_z = w0 * sqrt(1.0 + pow(z / z_r, 2.0));
+          float R_z = z * (1.0 + pow(z_r / z, 2.0));
+          float gouy_z = atan(z / z_r);
+          float k = (2.0 * PI * n) / wavelength;
+
+          Polarization polarization = light_object.polarization;
+ 
+  //        if (ray_to_light.optical_objects_through_which_it_passed > 0) {
+  //          polarization = cx_2x2_mat_x_cx_pol_mul(ray_to_light.optical_objects_found_product, polarization);
+  //        }
+
+          // Electric field definition
+          // I just break it down into two parts for readability
+          vec2 first_part_x_hat = cx_mul(polarization.Ex, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
+          vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
+          vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
+
+          polarization.Ex = cx_mul(first_part_x_hat, second_part);
+          polarization.Ey = cx_mul(first_part_y_hat, second_part);
+
+          lights_polarizations[light_source_index] = polarization;
+
+          // we want to weigh the contribution of each light source to the color
+          // before we do any fancy shmancy physics
+          float current_light_intensity = pow(cx_abs(cx_add(polarization.Ex, polarization.Ey)), 2.0) / (2.0 * n);
+          ray.color.xyz += bounced.color.xyz * current_light_intensity;
+        }
       }
+    }
+
+    if (light_sources_count > uint(0)) {
+      Polarization final_electric_field;
+        final_electric_field.Ex = vec2(0, 0);
+        final_electric_field.Ey = vec2(0, 0);
+
+      // add up all electric fields
+      for (uint i = uint(0); i < light_sources_count; i++) {
+        final_electric_field.Ex = cx_add(lights_polarizations[i].Ex, final_electric_field.Ex);
+        final_electric_field.Ey = cx_add(lights_polarizations[i].Ey, final_electric_field.Ey);
+      }
+
+      // color *= pow(cx_abs(final_electric_field.Ex), 2) + pow(cx_abs(final_electric_field.Ey), 2) + 0.2;
+      vec2 Ex = final_electric_field.Ex;
+      vec2 Ey = final_electric_field.Ey;
+      float result = pow(cx_abs(cx_add(Ex, Ey)), 2.0);
+
+      ray.color *= result;
     }
   }
 

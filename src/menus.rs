@@ -3,8 +3,8 @@ use std::{f32::consts::PI, ops::Deref};
 use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
-use egui_plot::Plot;
-use nalgebra::{RealField, Vector2, Vector3};
+use egui_plot::{Line, Plot, PlotPoints};
+use nalgebra::{Complex, ComplexField, RealField, Vector2, Vector3};
 use web_sys::console;
 
 use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
@@ -141,47 +141,95 @@ impl MenusState {
     }
 
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: &mut usize) {
-        ui.add(Label::new(format!("{:?}", world.objects[*selected_object_index])));
+        ui.add(Label::new(format!("{:?}", world.objects[*selected_object_index].object_type)));
 
         if ui.add(Button::new("Remove object")).clicked() {
             world.remove_object(*selected_object_index);
             *selected_object_index = 0;
+            return;
         }
 
-        if world.objects[*selected_object_index].object_type == ObjectType::SquareWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::RoundWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectSquareWall ||
-           world.objects[*selected_object_index].object_type == ObjectType::OpticalObjectRoundWall
-        {
-            let mut shapes = vec![];
+        let mut shapes = vec![];
 
-            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], (-PI / 2.0)..=(PI / 2.0)).text("X rotation"));
-            ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], (-PI / 2.0)..=(PI / 2.0)).text("Y rotation"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], -PI..=PI).text("X rotation"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], -PI..=PI).text("Y rotation"));
 
-            let response = Plot::new("rotation_plot")
-            .allow_drag(false)
-            .allow_boxed_zoom(false)
-            .allow_zoom(false)
-            .include_x(1.0)
-            .include_y(1.0)
-            .include_x(-1.0)
-            .include_y(-1.0)
-            .view_aspect(1.0)
-            .show(ui, |plot_ui| {
-                // vertical
-                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new((world.objects[*selected_object_index].rotation[0].abs() * 150.0) / (PI / 2.0), 150.0), Stroke::new(1.0, Color32::BLUE)));
+        let response = Plot::new("rotation_plot")
+        .allow_drag(false)
+        .allow_boxed_zoom(false)
+        .allow_zoom(false)
+        .include_x(1.0)
+        .include_y(1.0)
+        .include_x(-1.0)
+        .include_y(-1.0)
+        .view_aspect(2.0)
+        .show(ui, |plot_ui| {
+            // vertical
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new((world.objects[*selected_object_index].rotation[0].abs() * 100.0) / PI, 100.0), Stroke::new(1.0, Color32::BLUE)));
 
-                // horizontal
-                shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(150.0, (world.objects[*selected_object_index].rotation[1].abs() * 150.0) / (PI / 2.0)), Stroke::new(1.0, Color32::GREEN)));
+            // horizontal
+            shapes.push(Shape::ellipse_stroke(plot_ui.screen_from_plot([0.0, 0.0].into()), Vec2::new(100.0, (world.objects[*selected_object_index].rotation[1].abs() * 100.0) / PI), Stroke::new(1.0, Color32::GREEN)));
 
-                world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 2.0;
-                world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 2.0;
+            world.objects[*selected_object_index].rotation[0] += plot_ui.pointer_coordinate_drag_delta().x * 2.0;
+            world.objects[*selected_object_index].rotation[1] += plot_ui.pointer_coordinate_drag_delta().y * 2.0;
 
-                world.objects[*selected_object_index].rotation[0] = world.objects[*selected_object_index].rotation[0].clamp(-PI / 2.0, PI / 2.0);
-                world.objects[*selected_object_index].rotation[1] = world.objects[*selected_object_index].rotation[1].clamp(-PI / 2.0, PI / 2.0);
-            }).response;
+            world.objects[*selected_object_index].rotation[0] = world.objects[*selected_object_index].rotation[0].clamp(-PI, PI);
+            world.objects[*selected_object_index].rotation[1] = world.objects[*selected_object_index].rotation[1].clamp(-PI, PI);
+        }).response;
 
-            ui.painter().with_clip_rect(response.rect).extend(shapes);
+        ui.painter().with_clip_rect(response.rect).extend(shapes);
+
+
+        if world.objects[*selected_object_index].object_type == ObjectType::LightSource {
+            ui.add(Label::new("Light polarization"));
+
+            egui::ComboBox::from_label("Light source polarization")
+                .selected_text(format!("{}", world.objects[*selected_object_index].polarization_type))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearHorizontal, "Linear horizontal");
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearVertical, "Linear vertical");
+
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearDiagonal, "Linear rotated 45 degrees");
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearAntiDiagonal, "Linear rotated -45 degrees");
+
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularRightHand, "Right circular");
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularLeftHand, "Left circular");
+
+                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::NotPolarized, "Not polarized");
+                }
+            );
+
+            world.objects[*selected_object_index].set_light_polarization();
+
+            let retardation = Vector2::new(0.0, 0.0);
+            let angular_frequency = 1.0;
+
+            let jones_vector: Vector2<Complex<f32>> = Vector2::new(
+                (Complex::new(0.0f32, 1.0f32 * retardation.x)).exp(),
+                (Complex::new(0.0f32, 1.0f32 * retardation.y)).exp(),
+            ) * Complex::new(0.0f32, (-angular_frequency * time) as f32).exp();
+
+            let final_jones_vector = [0, 1].map(|i| jones_vector[i] * world.objects[*selected_object_index].polarization[i]);
+
+            let real: PlotPoints = (0..1000).map(|i| {
+                [(final_jones_vector[0] * 0.001 * i as f32).real() as f64, (final_jones_vector[1] * 0.001 * i as f32).real() as f64]
+            }).collect();
+
+            let real_line = Line::new(real);
+
+            let imaginary: PlotPoints = (0..1000).map(|i| {
+                [(final_jones_vector[0] * 0.001 * i as f32).imaginary() as f64, (final_jones_vector[1] * 0.001 * i as f32).imaginary() as f64]
+            }).collect();
+
+            let imaginary_line = Line::new(imaginary);
+
+            Plot::new("my_plot")
+                .view_aspect(2.0)
+                .include_x(1.0)
+                .include_y(1.0)
+                .include_x(-1.0)
+                .include_y(-1.0)
+                .show(ui, |plot_ui| {plot_ui.line(real_line); plot_ui.line(imaginary_line)});
         }
 
         color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
@@ -238,29 +286,8 @@ impl MenusState {
 
                 ui.add_space(10.0);
 
-                match self.selected_polarizer_type {
-                    PolarizerType::LinearTheta                   | 
-                    PolarizerType::QuarterWavePlateFastAxisTheta | 
-                    PolarizerType::HalfWavePlateFastAxisTheta    | 
-                    PolarizerType::HalfWavePlateRotatedTheta     => {
-                        ui.add(Slider::new(&mut self.angle, 0.0..=2.0*PI).text("θ"));
-                    }
-
-                    PolarizerType::GeneralWavePlateLinearRetarderTheta => {
-                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
-                        ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
-                    }
-
-                    PolarizerType::ArbitraryBirefringentMaterialTheta => {
-                        ui.add(Slider::new(&mut self.angle, 0.0..=PI).text("θ"));
-                        ui.add(Slider::new(&mut self.relative_phase_retardation, 0.0..=2.0*PI).text("Relative phase retardation (η)"));
-                        ui.add(Slider::new(&mut self.circularity, (-PI/2.0)..=(PI/2.0)).text("Circularity (φ)"));
-                    }
-
-                    _ => {}
-                }
-
-                self.object_creation_state.set_light_polarization(self.selected_light_polarization);
+                self.object_creation_state.polarization_type = self.selected_light_polarization;
+                self.object_creation_state.set_light_polarization();
 
                 ui.add_space(10.0);
 
@@ -359,13 +386,14 @@ impl MenusState {
             }
         }
 
+        self.object_creation_state.rotation[0] += 0.01;
+
         if ui.add(Button::new("Create object in your position")).clicked() {
             // we want to spawn the object a bit ahead from the viewer's look at direction
-            let mut ray_dir = Vector3::new(0.0, 0.0, 1.0);
 
-            ray_dir = rotate3d_x(ray_dir, viewer_look_at_direction.y);
-            ray_dir = rotate3d_y(ray_dir, viewer_look_at_direction.x);
-            ray_dir = ray_dir.normalize() * 2.0;
+            let ray_dir_y = rotate3d_y(Vector3::new(0.0, 0.0, 1.0), viewer_look_at_direction.x);
+            let ray_dir_x = rotate3d_x(Vector3::new(0.0,-1.0, 0.0), viewer_look_at_direction.y);
+            let ray_dir = (ray_dir_x + ray_dir_y).normalize() * 2.0;
 
             let create_object_position = viewer_position + ray_dir;
             self.object_creation_state.center = [create_object_position[0], create_object_position[1], create_object_position[2]];

@@ -155,7 +155,8 @@ pub struct WorldObject {
     pub height: f32,
     pub radius: f32,
     pub polarization: Vector2<Complex<f32>>,
-    pub jones_matrix: Matrix2<Complex<f32>>
+    pub jones_matrix: Matrix2<Complex<f32>>,
+    pub polarization_type: LightPolarizationType
 }
 
 #[derive(Copy, Clone)]
@@ -384,11 +385,14 @@ impl WorldObject {
             radius: 0.5,
 
             polarization: Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)),
-            jones_matrix: Matrix2::zeros()
+            jones_matrix: Matrix2::zeros(),
+
+            polarization_type: LightPolarizationType::NotPolarized
         }
     }
 
-    pub fn set_light_polarization(&mut self, type_of_object: LightPolarizationType) {
+    pub fn set_light_polarization(&mut self) {
+        let type_of_object = self.polarization_type;
         match type_of_object {
             LightPolarizationType::NotPolarized => {
                 self.polarization = Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0))

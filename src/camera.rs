@@ -62,8 +62,8 @@ impl Camera {
         movement = movement.normalize() * 0.5;
 
         self.position += movement;
-        self.position.x = self.position.x.clamp(2.0, 100.);
-        self.position.y = self.position.y.clamp(2.0, 100.);
-        self.position.z = self.position.z.clamp(2.0, 100.);
+        self.position.x = self.position.x.clamp(2.0, 20.);
+        self.position.y = self.position.y.clamp(2.0, 20.);
+        self.position.z = self.position.z.clamp(2.0, 20.);
     }
 }
