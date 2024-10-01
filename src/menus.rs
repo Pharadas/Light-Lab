@@ -10,7 +10,6 @@ use web_sys::console;
 use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
-    pub selected_object: Option<WorldObject>,
     selected_polarizer_type: PolarizerType,
     selected_light_polarization: LightPolarizationType,
     selected_color: Color32,
@@ -48,7 +47,6 @@ fn generate_colors_list() -> Vec<[u8; 4]> {
 impl MenusState {
     pub fn new(image_texture: TextureHandle, debug_texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
-            selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
             selected_color: Color32::from_rgb(178, 127, 127),
             selected_light_polarization: LightPolarizationType::NotPolarized,
