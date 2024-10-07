@@ -1,5 +1,6 @@
 use std::{f32::consts::PI};
 
+use eframe::glow::FRONT;
 use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};
@@ -7,9 +8,10 @@ use egui_plot::{Line, Plot, PlotPoints};
 use nalgebra::{Complex, ComplexField, Vector2, Vector3};
 use web_sys::console;
 
-use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
+use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{Alignment, LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
+    pub selected_object: Option<WorldObject>,
     selected_polarizer_type: PolarizerType,
     selected_light_polarization: LightPolarizationType,
     selected_color: Color32,
@@ -22,6 +24,7 @@ pub struct MenusState {
     raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>,
     image_sizes: Vec<[usize; 2]>,
     pub should_display_debug_menu: bool,
+    pub trying_to_align_to_object: bool,
     should_display_debug_objects_view: bool
 }
 
@@ -47,6 +50,7 @@ fn generate_colors_list() -> Vec<[u8; 4]> {
 impl MenusState {
     pub fn new(image_texture: TextureHandle, debug_texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
+            selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
             selected_color: Color32::from_rgb(178, 127, 127),
             selected_light_polarization: LightPolarizationType::NotPolarized,
@@ -59,6 +63,7 @@ impl MenusState {
             raw_images,
             image_sizes,
             should_display_debug_menu: false,
+            trying_to_align_to_object: false,
             should_display_debug_objects_view: false
         };
     }
@@ -69,11 +74,14 @@ impl MenusState {
         egui::CollapsingHeader::new("Gpu compatible objects list")
             .show(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.add(Label::new(format!("{:?}", world.get_gpu_compatible_world_objects_list().chunks(21).into_iter().map(|chunk| chunk).collect::<Vec<&[u32]>>())));
+                ui.add(Label::new(format!("{:?}", world.get_gpu_compatible_world_objects_list().chunks(24).into_iter().map(|chunk| chunk).collect::<Vec<&[u32]>>())));
             });
         });
 
-        ui.add(Label::new(format!("{:?}", world.light_sources)));
+        ui.add(Label::new(format!("Light sources: {:?}", world.light_sources)));
+        ui.add(Label::new(format!("World objects stack: {:?}", world.objects_stack)));
+        ui.add(Label::new(format!("World objects associations: {:?}", world.objects_associations)));
+        ui.add(Label::new(format!("Aligned objects: {:?}", world.aligned_objects)));
 
         TableBuilder::new(ui)
             .column(Column::auto().resizable(true))
@@ -140,6 +148,35 @@ impl MenusState {
 
     pub fn inspect_object_menu(&mut self, ui: &mut Ui, world: &mut World, time: f64, selected_object_index: &mut usize) {
         ui.add(Label::new(format!("{:?}", world.objects[*selected_object_index].object_type)));
+        ui.add(Label::new(format!("Object index: {:?}", *selected_object_index)));
+
+        if self.trying_to_align_to_object && ui.add(Button::new("Cancel object align")).clicked() {
+            self.trying_to_align_to_object = false;
+
+        } else if world.objects[*selected_object_index].aligned_to_object != 0 {
+            ui.add(Label::new(format!("Aligned to: {:?}", world.objects[world.objects[*selected_object_index].aligned_to_object].object_type)));
+
+            egui::ComboBox::from_label("Object alignment")
+                .selected_text(format!("{}", world.objects[*selected_object_index].alignment))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut world.objects[*selected_object_index].alignment, Alignment::FRONT, "Front");
+                    ui.selectable_value(&mut world.objects[*selected_object_index].alignment, Alignment::RIGHT, "Right");
+                    ui.selectable_value(&mut world.objects[*selected_object_index].alignment, Alignment::UP, "Up");
+                }
+            );
+
+            ui.add(Slider::new(&mut world.objects[*selected_object_index].aligned_distance, -1.0..=1.0).text("Distance from object"));
+
+            if ui.add(Button::new("Remove alignment")).clicked() {
+                world.objects[*selected_object_index].aligned_to_object = 0;
+                world.objects[*selected_object_index].alignment = Alignment::FRONT;
+                world.objects[*selected_object_index].aligned_distance = 0.0;
+            }
+
+        } else if ui.add(Button::new("Align to object")).clicked() {
+
+            self.trying_to_align_to_object = true;
+        }
 
         if ui.add(Button::new("Remove object")).clicked() {
             world.remove_object(*selected_object_index);

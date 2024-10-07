@@ -1,10 +1,10 @@
-use std::{collections::HashMap, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
+use std::{collections::{HashMap, HashSet}, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
 use egui::Color32;
-use nalgebra::{Complex, ComplexField, Matrix2, Vector2, Vector3};
+use nalgebra::{Complex, ComplexField, Matrix2, RealField, Vector, Vector2, Vector3};
 use web_sys::console;
 use serde::{Deserialize, Serialize};
 
-use crate::{gpu_hash::GPUHashTable, util::i32_to_u32_vec};
+use crate::{camera::{rotate3d_x, rotate3d_y}, gpu_hash::GPUHashTable, util::i32_to_u32_vec};
 
 // WorldObject.type possible values
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -69,6 +69,25 @@ pub enum PolarizerType {
     ArbitraryBirefringentMaterialTheta = 12
 }
 
+#[derive(PartialEq, Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum Alignment {
+    FRONT,
+    RIGHT,
+    UP
+}
+
+// Needed for the drop down list
+impl Display for Alignment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::FRONT => write!(f, "Front"),
+            Self::RIGHT => write!(f, "Right"),
+            Self::UP => write!(f, "Up"),
+        }
+    }
+}
+
+
 // Needed for the drop down list
 impl Display for LightPolarizationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -86,7 +105,6 @@ impl Display for LightPolarizationType {
         }
     }
 }
-
 
 // Needed for the drop down list
 impl Display for PolarizerType {
@@ -127,18 +145,24 @@ pub struct WorldObject {
     pub radius: f32,
     pub polarization: Vector2<Complex<f32>>,
     pub jones_matrix: Matrix2<Complex<f32>>,
-    pub polarization_type: LightPolarizationType
+    pub polarization_type: LightPolarizationType,
+
+    // these next 3 should probably be an option for correctness
+    pub aligned_to_object: usize,
+    pub alignment: Alignment,
+    pub aligned_distance: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
     pub objects: [WorldObject; 166],
+    pub aligned_objects: HashSet<usize>,
     // would be an array but i want to be able to use pop()
     // to remove an item but keep the memory contiguous
     pub light_sources: Vec<u32>,
-    objects_stack: Vec<usize>,
-    objects_associations: HashMap<usize, Vec<Vector3<u32>>>,
+    pub objects_stack: Vec<usize>,
+    pub objects_associations: HashMap<usize, Vec<Vector3<u32>>>,
 }
 
 impl World {
@@ -146,6 +170,7 @@ impl World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
             objects: [WorldObject::new(); 166],
+            aligned_objects: HashSet::new(),
             light_sources: vec![],
             objects_stack: (1..166).collect(),
             objects_associations: HashMap::new()
@@ -172,7 +197,7 @@ impl World {
         // and mark that space as available
         self.objects[object_index] = WorldObject::new();
         self.objects_stack.push(object_index);
-
+        self.objects_associations.remove(&object_index);
     }
 
     // this should return an ok, in case the objects list is full and we can't add
@@ -230,6 +255,34 @@ impl World {
         self.objects_associations.insert(available_index, object_positions);
         self.objects[available_index] = object_definition;
         return available_index;
+    }
+
+    pub fn update_object_position(&mut self, object_index: usize, object_definition: WorldObject) {
+        for position_occupied_by_object in self.objects_associations.get(&object_index).unwrap() {
+            match self.hash_map.remove(*position_occupied_by_object, object_index as u32) {
+                Ok(()) => {}
+                Err(e) => {console::log_1(&e.into())}
+            }
+        }
+
+        console::log_1(&format!("Removing object associations for index: {:?}", &object_index).into());
+        self.objects_associations.remove(&object_index);
+
+        let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
+        let truncated_radius = object_definition.radius as u32 + 1;
+        let mut object_positions = vec![];
+
+        // this can only be used on non cube objects
+        for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
+            for y in (center[1] - truncated_radius)..=(center[1] + truncated_radius) {
+                for z in (center[2] - truncated_radius)..=(center[2] + truncated_radius) {
+                    self.hash_map.insert(Vector3::new(x, y, z) + Vector3::new(100, 100, 100), object_index as u32);
+                    object_positions.push(Vector3::new(x, y, z) + Vector3::new(100, 100, 100));
+                }
+            }
+        }
+
+        self.objects_associations.insert(object_index, object_positions);
     }
 
     pub fn get_gpu_compatible_world_objects_list(&self) -> Vec<u32> {
@@ -291,8 +344,42 @@ impl WorldObject {
             polarization: Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)),
             jones_matrix: Matrix2::zeros(),
 
-            polarization_type: LightPolarizationType::NotPolarized
+            polarization_type: LightPolarizationType::NotPolarized,
+
+            aligned_to_object: 0,
+            alignment: Alignment::FRONT,
+            aligned_distance: 0.0
         }
+    }
+
+    pub fn update_object_aligned_position(&mut self, aligned_to_object: &WorldObject) {
+        let ray_dir: Vector3<f32>;
+
+        match self.alignment {
+            Alignment::FRONT => {
+                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
+                let ray_dir_x = rotate3d_x(Vector3::new(0.0, 0.0, 1.0), aligned_to_object.rotation[1]);
+                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+            }
+
+            Alignment::RIGHT => {
+                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
+                let ray_dir_x = rotate3d_x(Vector3::new(1.0, 0.0, 0.0), aligned_to_object.rotation[1]);
+                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+            }
+
+            Alignment::UP => {
+                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
+                let ray_dir_x = rotate3d_x(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[1]);
+                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+            }
+        }
+
+        self.center = [aligned_to_object.center[0] + ray_dir.x, aligned_to_object.center[1] + ray_dir.y, aligned_to_object.center[2] + ray_dir.z];
+
+        self.center[0] = self.center[0].clamp(0.5, 24.5);
+        self.center[1] = self.center[1].clamp(0.5, 24.5);
+        self.center[2] = self.center[2].clamp(0.5, 24.5);
     }
 
     pub fn set_light_polarization(&mut self) {

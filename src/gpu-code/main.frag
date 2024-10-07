@@ -565,9 +565,9 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       return true;
     }
 
-    if ((ray.map_pos.x > 20 || ray.map_pos.x <= 1) || 
-        (ray.map_pos.y > 20 || ray.map_pos.y <= 1) ||
-        (ray.map_pos.z > 20 || ray.map_pos.z <= 1)
+    if ((ray.map_pos.x >= 25 || ray.map_pos.x < 2) || 
+        (ray.map_pos.y >= 25 || ray.map_pos.y < 2) ||
+        (ray.map_pos.z >= 25 || ray.map_pos.z < 2)
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
@@ -650,6 +650,7 @@ void main() {
         if ((past_plane_product_light > 0.0 && past_plane_product_ray < 0.0) || (past_plane_product_light < 0.0 && past_plane_product_ray > 0.0)) {
           out_color = vec4(0.0, 0.0, 0.0, 1.0);
           ray_facing_light = false;
+          // bad code, return too early
           return;
         }
 
@@ -657,6 +658,7 @@ void main() {
         if (dot(vec3(ray.map_pos) - light_object.center, vec3(ray.mask) * -ray.dir) > 0.0) {
           out_color = vec4(0.0, 0.0, 0.0, 1.0);
           ray_facing_light = false;
+          // bad code, return too early
           return;
         }
       }
@@ -683,11 +685,12 @@ void main() {
           // virtual distance
           float radius = computeDistance(light_object.center, light_object.center + light_point_dir, bounced.pos) * cube_scaling_factor;
           float z = length(light_object.center - ray.current_real_position) * cube_scaling_factor;
+          // float z = 10.0;
 
           // Gaussian beam definition
           // TODO: this should also be part of some light definition
           float wavelength = 1.0;
-          float w0 = 10.0 * cube_scaling_factor;
+          float w0 = 1.0;
           float n = 1.0;
           float z_r = (PI * w0 * w0 * n) / wavelength;
           float w_z = w0 * sqrt(1.0 + pow(z / z_r, 2.0));
@@ -707,8 +710,8 @@ void main() {
           vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
           vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
 
-          polarization.Ex = cx_mul(first_part_x_hat, second_part);
-          polarization.Ey = cx_mul(first_part_y_hat, second_part);
+          polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
+          polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
 
           lights_polarizations[light_source_index] = polarization;
 

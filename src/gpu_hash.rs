@@ -97,7 +97,6 @@ impl GPUHashTable {
         }
 
         let mut current_object = self.objects[self.buckets[bucket_index] as usize];
-        console::log_1(&format!("Removing item: {:?} with key: {:?} and buckets index: {:?}", current_object, key, bucket_index).into());
 
         let mut last_index = u32::MAX;
         let mut current_index = self.buckets[bucket_index];
@@ -112,6 +111,7 @@ impl GPUHashTable {
                 // items are liberated backwards, could change that to
                 // optimize for cache hits
                 self.objects_left.push(current_index as usize); // "liberate" this index
+                console::log_1(&format!("Current object is: {:?}", current_object).into());
 
                 // the simplest case, there's only one item left and
                 // it's the one we want to remove
@@ -140,10 +140,10 @@ impl GPUHashTable {
                     console::log_1(&format!("Object wasn't unique in linked list").into());
                     self.objects[last_index as usize].next = current_object.next;
                     self.objects[current_index as usize] = KeyValue {key: 0, value: 0, next: u32::MAX};
-                    last_index = current_index;
                 }
             }
 
+            last_index = current_index;
             current_index = current_object.next;
         }
         return Ok(());

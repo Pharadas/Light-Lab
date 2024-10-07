@@ -9,7 +9,7 @@ use image::RgbaImage;
 use nalgebra::{Complex, Matrix2, Vector2, Vector3};
 use web_sys::console;
 
-use crate::{camera::Camera, menus::MenusState, world::{LightPolarizationType, ObjectType, World, WorldObject}};
+use crate::{camera::Camera, menus::MenusState, world::{self, LightPolarizationType, ObjectType, World, WorldObject}};
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -77,13 +77,13 @@ impl MainApp {
 
         // load demo
         let mut demo_world = World::new();
-        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal };
-        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal };
-        let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized };
+        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
+        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
+        let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
 
         demo_world.insert_object(Vector3::from_vec(demo_red_light.center.into_iter().map(|x| x as i32).collect()), demo_red_light);
         demo_world.insert_object(Vector3::from_vec(demo_blue_light.center.into_iter().map(|x| x as i32).collect()), demo_blue_light);
-        demo_world.insert_object(Vector3::from_vec(demo_wall.center.into_iter().map(|x| x as i32).collect()), demo_wall);
+        // demo_world.insert_object(Vector3::from_vec(demo_wall.center.into_iter().map(|x| x as i32).collect()), demo_wall);
 
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
@@ -106,7 +106,7 @@ impl eframe::App for MainApp {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"));
 
-                        ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.05..=3.0).text("Cube size in meters"));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"));
 
                         if self.menus.should_display_debug_menu {
                             if ui.add(Button::new("Hide debug menu")).clicked() {
@@ -172,12 +172,14 @@ impl MainApp {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
         let curr_response = ui.interact(ui.min_rect(), egui::Id::new("Some Id"), egui::Sense::click());
-        let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
+let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
         let objects_found = self.glow_program.lock().objects_found.clone();
 
+        // some stuff relating to pressing on the screen to select object
         if curr_response.clicked() {
             console::log_1(&format!("original hover position: {:?}", curr_response.hover_pos()).into());
 
+            // texture is rotated
             let texture_coordinates_hover_pos = [
                 ((curr_response.hover_pos().unwrap().x * current_texture_resolution[0] as f32) / rect.right_bottom().x) as i32,
                 ((curr_response.hover_pos().unwrap().y * current_texture_resolution[1] as f32) / rect.right_bottom().y) as i32
@@ -186,14 +188,43 @@ impl MainApp {
             console::log_1(&format!("texture coordinates hover position: {:?}", texture_coordinates_hover_pos).into());
 
             let object_found_index = objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize];
-            self.glow_program.lock().currently_selected_object = object_found_index as usize;
 
-            // console::log_1(&format!("value at texture space coordinates: {:?}", objects_found.len()).into());
+            if !self.menus.trying_to_align_to_object {
+                self.glow_program.lock().currently_selected_object = object_found_index as usize;
+            } else {
+                self.world.objects[self.glow_program.lock().currently_selected_object].aligned_to_object = object_found_index as usize;
+                self.world.aligned_objects.insert(self.glow_program.lock().currently_selected_object);
+                self.menus.trying_to_align_to_object = false;
+            }
+
             console::log_1(&format!("value at texture space coordinates: {:?}", objects_found[((((current_texture_resolution[1] - texture_coordinates_hover_pos[1]) * current_texture_resolution[0]) + texture_coordinates_hover_pos[0]) * 4) as usize]).into());
         }
 
+        let aligned_objects = self.world.aligned_objects.clone();
+
+        for object_index in aligned_objects {
+            // TODO there must be a way to pass it without cloning since
+            // it's an immutable borrow
+            let mut selected_object: WorldObject = self.world.objects[object_index].clone();
+            let aligned_object: WorldObject = self.world.objects[selected_object.aligned_to_object].clone();
+
+            // TODO: this shows that the worldobjects should have access to their info
+            // in the gpu_hash
+            selected_object.update_object_aligned_position(&aligned_object);
+
+            let has_moved = 
+                self.world.objects[object_index].center[0] != selected_object.center[0] ||
+                self.world.objects[object_index].center[1] != selected_object.center[1] ||
+                self.world.objects[object_index].center[2] != selected_object.center[2];
+
+            self.world.objects[object_index] = selected_object;
+
+            if has_moved {
+                self.world.update_object_position(object_index, selected_object);
+            }
+        }
+
         if response.clicked_elsewhere() {
-        //     console::log_1(&format!("main window clicked!").into());
             console::log_1(&format!("{:?}", response.hover_pos()).into());
         }
 
@@ -456,10 +487,12 @@ impl MainGlowProgram {
                 world.light_sources.len() as u32
             );
 
-            gl.uniform_1_u32_slice(
-                gl.get_uniform_location(self.main_image_program, "lights_definitions_indices").as_ref(),
-                &world.light_sources.as_slice()
-            );
+            if !world.light_sources.is_empty() {
+                gl.uniform_1_u32_slice(
+                    gl.get_uniform_location(self.main_image_program, "lights_definitions_indices").as_ref(),
+                    &world.light_sources.as_slice()
+                );
+            }
 
             gl.uniform_1_u32_slice(
                 gl.get_uniform_location(self.main_image_program, "buckets").as_ref(),
