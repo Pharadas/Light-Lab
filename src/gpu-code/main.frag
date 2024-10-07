@@ -565,9 +565,9 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
       return true;
     }
 
-    if ((ray.map_pos.x >= 25 || ray.map_pos.x < 2) || 
-        (ray.map_pos.y >= 25 || ray.map_pos.y < 2) ||
-        (ray.map_pos.z >= 25 || ray.map_pos.z < 2)
+    if ((ray.map_pos.x >= 25 || ray.map_pos.x < 1) || 
+        (ray.map_pos.y >= 25 || ray.map_pos.y < 1) ||
+        (ray.map_pos.z >= 25 || ray.map_pos.z < 1)
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;

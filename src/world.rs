@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, f32::consts::PI, fmt::{self, Display, Formatter}, u32};
 use egui::Color32;
-use nalgebra::{Complex, ComplexField, Matrix2, RealField, Vector, Vector2, Vector3};
+use nalgebra::{Complex, ComplexField, Matrix2, Vector2, Vector3};
 use web_sys::console;
 use serde::{Deserialize, Serialize};
 
@@ -151,6 +151,10 @@ pub struct WorldObject {
     pub aligned_to_object: usize,
     pub alignment: Alignment,
     pub aligned_distance: f32,
+    // i want to make a vector but it doesn't implement copy
+    // sometimes i regret ever trying to use rust at all
+    // for now i'll just limit the amount of possibly aligned objects to 1
+    pub object_aligned_to_self: usize
 }
 
 #[derive(Debug, Clone)]
@@ -179,6 +183,13 @@ impl World {
 
     pub fn remove_object(&mut self, object_index: usize) {
         console::log_1(&format!("Positions occupied by object: {:?}", self.objects_associations.get(&object_index).unwrap()).into());
+
+        self.aligned_objects.remove(&self.objects[object_index].object_aligned_to_self);
+        // nasty but u know
+        self.objects[self.objects[object_index].object_aligned_to_self].aligned_to_object = 0;
+
+        console::log_1(&format!("aligned objects: {:?}", self.aligned_objects).into());
+
         for position_occupied_by_object in self.objects_associations.get(&object_index).unwrap() {
             match self.hash_map.remove(*position_occupied_by_object, object_index as u32) {
                 Ok(()) => {}
@@ -348,7 +359,8 @@ impl WorldObject {
 
             aligned_to_object: 0,
             alignment: Alignment::FRONT,
-            aligned_distance: 0.0
+            aligned_distance: 0.0,
+            object_aligned_to_self: 0
         }
     }
 

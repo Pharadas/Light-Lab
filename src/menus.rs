@@ -1,6 +1,5 @@
-use std::{f32::consts::PI};
+use std::f32::consts::PI;
 
-use eframe::glow::FRONT;
 use egui::{self, color_picker::color_picker_color32, Button, Color32, ColorImage, Label, Shape, Slider, Stroke, TextureHandle, TextureOptions, Ui, Vec2};
 use egui_extras::{Column, TableBuilder};
 use ::image::{ImageBuffer, Rgba};

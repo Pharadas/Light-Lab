@@ -77,9 +77,10 @@ impl MainApp {
 
         // load demo
         let mut demo_world = World::new();
-        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
-        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [3.1415927, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
-        let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0 };
+        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 164, alignment: world::Alignment::FRONT, aligned_distance: 0.5, object_aligned_to_self: 0 };
+        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 165 };
+        // let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 0 };
+        demo_world.aligned_objects.insert(165);
 
         demo_world.insert_object(Vector3::from_vec(demo_red_light.center.into_iter().map(|x| x as i32).collect()), demo_red_light);
         demo_world.insert_object(Vector3::from_vec(demo_blue_light.center.into_iter().map(|x| x as i32).collect()), demo_blue_light);
@@ -172,7 +173,7 @@ impl MainApp {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
 
         let curr_response = ui.interact(ui.min_rect(), egui::Id::new("Some Id"), egui::Sense::click());
-let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
+        let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
         let objects_found = self.glow_program.lock().objects_found.clone();
 
         // some stuff relating to pressing on the screen to select object
@@ -191,8 +192,19 @@ let current_texture_resolution = self.glow_program.lock().current_texture_resolu
 
             if !self.menus.trying_to_align_to_object {
                 self.glow_program.lock().currently_selected_object = object_found_index as usize;
+
             } else {
                 self.world.objects[self.glow_program.lock().currently_selected_object].aligned_to_object = object_found_index as usize;
+
+                let selected_object = self.world.objects[object_found_index as usize];
+
+                // in case some other object was already aligned to this one
+                if selected_object.aligned_to_object != 0 {
+                    self.world.aligned_objects.remove(&self.world.objects[selected_object.object_aligned_to_self].aligned_to_object);
+                    self.world.objects[selected_object.object_aligned_to_self].aligned_to_object = 0;
+                }
+                self.world.objects[object_found_index as usize].object_aligned_to_self = self.glow_program.lock().currently_selected_object;
+
                 self.world.aligned_objects.insert(self.glow_program.lock().currently_selected_object);
                 self.menus.trying_to_align_to_object = false;
             }
@@ -404,7 +416,7 @@ impl MainGlowProgram {
                 current_texture_resolution: [0, 0],
                 objects_found: vec![0u8],
                 desired_scaling_factor: 0.25,
-                cube_scaling_factor: 3.0,
+                cube_scaling_factor: 10.0,
                 currently_selected_object: 0
             })
         }

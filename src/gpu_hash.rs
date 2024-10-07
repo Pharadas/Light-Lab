@@ -96,7 +96,7 @@ impl GPUHashTable {
             return Err(format!("Item with key {:?} couldn't be found", key).to_string());
         }
 
-        let mut current_object = self.objects[self.buckets[bucket_index] as usize];
+        let mut current_object: KeyValue;
 
         let mut last_index = u32::MAX;
         let mut current_index = self.buckets[bucket_index];
@@ -134,7 +134,6 @@ impl GPUHashTable {
                     self.objects[current_index as usize] = KeyValue {key: 0, value: 0, next: u32::MAX};
                     // update first item
                     self.buckets[bucket_index] = current_object.next;
-                    last_index = u32::MAX;
 
                 } else {
                     console::log_1(&format!("Object wasn't unique in linked list").into());
