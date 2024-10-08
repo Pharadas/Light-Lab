@@ -273,12 +273,8 @@ impl MenusState {
         egui::ComboBox::from_label("Polarizer/Phase retarder")
             .selected_text(format!("{}", self.object_creation_state.object_type))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::CubeWall,                "Wall (cube)");
-                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::SquareWall,              "Wall (square)");
                 ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::RoundWall,               "Wall (round)");
                 ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::LightSource,             "Light source (sphere)");
-                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectCube,       "Optical object (cube)");
-                ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectSquareWall, "Optical object (square)");
                 ui.selectable_value(&mut self.object_creation_state.object_type, ObjectType::OpticalObjectRoundWall,  "Optical object (round)");
             }
         );

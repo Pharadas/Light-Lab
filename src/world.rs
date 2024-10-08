@@ -342,7 +342,7 @@ impl World {
 impl WorldObject {
     pub fn new() -> WorldObject {
         return WorldObject {
-            object_type: ObjectType::CubeWall,
+            object_type: ObjectType::RoundWall,
             rotation: [0.0, PI / 2.0],
 
             center: [0.0, 0.0, 0.0],
