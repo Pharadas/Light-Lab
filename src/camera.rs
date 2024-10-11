@@ -41,10 +41,15 @@ impl Camera {
 
     pub fn update(&mut self, key: egui::Key) {
         let mut movement: Vector3<f32> = Vector3::new(0.0, 0.0, 0.0);
+        let mut horizontal_movement = 0.0;
 
         match key {
             egui::Key::D => movement.x += 1.0,
             egui::Key::A => movement.x -= 1.0,
+
+            egui::Key::E => horizontal_movement += 1.0,
+            egui::Key::Q => horizontal_movement -= 1.0,
+
             egui::Key::W => movement.z += 1.0,
             egui::Key::S => movement.z -= 1.0,
 
@@ -53,11 +58,12 @@ impl Camera {
 
         movement = rotate3d_x(movement, self.look_direction.y);
         movement = rotate3d_y(movement, self.look_direction.x);
+        movement.y += horizontal_movement;
         movement = movement.normalize();
 
         // self.rotate3d_x(&mut movement);
         // self.rotate3d_y(&mut movement);
-        movement = movement.normalize() * 0.5;
+        movement = movement.normalize() * 0.1;
 
         self.position += movement;
         self.position.x = self.position.x.clamp(2., 24.);

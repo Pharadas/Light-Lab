@@ -87,7 +87,6 @@ impl Display for Alignment {
     }
 }
 
-
 // Needed for the drop down list
 impl Display for LightPolarizationType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -185,6 +184,7 @@ impl World {
         console::log_1(&format!("Positions occupied by object: {:?}", self.objects_associations.get(&object_index).unwrap()).into());
 
         self.aligned_objects.remove(&self.objects[object_index].object_aligned_to_self);
+        self.aligned_objects.remove(&object_index);
         // nasty but u know
         self.objects[self.objects[object_index].object_aligned_to_self].aligned_to_object = 0;
 
@@ -209,6 +209,7 @@ impl World {
         self.objects[object_index] = WorldObject::new();
         self.objects_stack.push(object_index);
         self.objects_associations.remove(&object_index);
+        console::log_1(&format!("{:?}", self.objects_associations).into());
     }
 
     // this should return an ok, in case the objects list is full and we can't add
@@ -343,7 +344,7 @@ impl WorldObject {
     pub fn new() -> WorldObject {
         return WorldObject {
             object_type: ObjectType::RoundWall,
-            rotation: [0.0, PI / 2.0],
+            rotation: [0.0, 0.0],
 
             center: [0.0, 0.0, 0.0],
             color: Color32::from_rgb(255, 0, 0),
@@ -365,27 +366,25 @@ impl WorldObject {
     }
 
     pub fn update_object_aligned_position(&mut self, aligned_to_object: &WorldObject) {
-        let ray_dir: Vector3<f32>;
+        let mut ray_dir: Vector3<f32>;
 
         match self.alignment {
             Alignment::FRONT => {
-                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
-                let ray_dir_x = rotate3d_x(Vector3::new(0.0, 0.0, 1.0), aligned_to_object.rotation[1]);
-                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+                ray_dir = Vector3::new(0.0, 0.0, -1.0);
             }
 
             Alignment::RIGHT => {
-                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
-                let ray_dir_x = rotate3d_x(Vector3::new(1.0, 0.0, 0.0), aligned_to_object.rotation[1]);
-                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+                ray_dir = Vector3::new(1.0, 0.0, 0.0);
             }
 
             Alignment::UP => {
-                let ray_dir_y = rotate3d_y(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[0]);
-                let ray_dir_x = rotate3d_x(Vector3::new(0.0, 1.0, 0.0), aligned_to_object.rotation[1]);
-                ray_dir = (ray_dir_x + ray_dir_y).normalize() * self.aligned_distance;
+                ray_dir = Vector3::new(0.0, 1.0, 0.0);
             }
         }
+
+        ray_dir = rotate3d_x(ray_dir, aligned_to_object.rotation[1]);
+        ray_dir = rotate3d_y(ray_dir, aligned_to_object.rotation[0]);
+        ray_dir = (ray_dir).normalize() * self.aligned_distance;
 
         self.center = [aligned_to_object.center[0] + ray_dir.x, aligned_to_object.center[1] + ray_dir.y, aligned_to_object.center[2] + ray_dir.z];
 

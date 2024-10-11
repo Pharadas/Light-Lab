@@ -416,8 +416,6 @@ impl MenusState {
             }
         }
 
-        self.object_creation_state.rotation[0] += 0.01;
-
         if ui.add(Button::new("Create object in your position")).clicked() {
             // we want to spawn the object a bit ahead from the viewer's look at direction
 

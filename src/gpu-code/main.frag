@@ -678,25 +678,15 @@ void main() {
           bounced.ended_in_hit = false;
 
         if (iterateRayInDirection(bounced, light_source_goal)) {
-          vec3 light_point_dir_x = rotate3dY(vec3(0.0, 0.0, 1.0), light_object.rotation.x);
-          vec3 light_point_dir_y = rotate3dX(vec3(0.0, -1.0, 0.0), light_object.rotation.y);
-          vec3 light_point_dir = normalize(light_point_dir_x + light_point_dir_y);
+          vec3 light_dir = vec3(0.0, 0.0, -1.0);
+          light_dir = rotate3dX(light_dir, light_object.rotation.y);
+          light_dir = rotate3dY(light_dir, light_object.rotation.x);
+          light_dir = normalize(light_dir);
 
           // virtual distance
-          float radius = computeDistance(light_object.center, light_object.center + light_point_dir, bounced.pos) * cube_scaling_factor;
+          float radius = computeDistance(light_object.center, light_object.center + light_dir, bounced.pos) * cube_scaling_factor;
           float z = length(light_object.center - ray.current_real_position) * cube_scaling_factor;
-          // float z = 10.0;
-
-          // Gaussian beam definition
-          // TODO: this should also be part of some light definition
-          float wavelength = 1.0;
-          float w0 = 1.0;
           float n = 1.0;
-          float z_r = (PI * w0 * w0 * n) / wavelength;
-          float w_z = w0 * sqrt(1.0 + pow(z / z_r, 2.0));
-          float R_z = z * (1.0 + pow(z_r / z, 2.0));
-          float gouy_z = atan(z / z_r);
-          float k = (2.0 * PI * n) / wavelength;
 
           Polarization polarization = light_object.polarization;
  
@@ -704,14 +694,31 @@ void main() {
   //          polarization = cx_2x2_mat_x_cx_pol_mul(ray_to_light.optical_objects_found_product, polarization);
   //        }
 
-          // Electric field definition
-          // I just break it down into two parts for readability
-          vec2 first_part_x_hat = cx_mul(polarization.Ex, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
-          vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
-          vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
+          if (true) {
+            // Gaussian beam definition
+            // TODO: this should also be part of some light definition
+            float wavelength = 1.0;
+            float w0 = 1.0;
+            float z_r = (PI * w0 * w0 * n) / wavelength;
+            float w_z = w0 * sqrt(1.0 + pow(z / z_r, 2.0));
+            float R_z = z * (1.0 + pow(z_r / z, 2.0));
+            float gouy_z = atan(z / z_r);
+            float k = (2.0 * PI * n) / wavelength;
 
-          polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
-          polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
+            // Electric field definition
+            // I just break it down into two parts for readability
+            vec2 first_part_x_hat = cx_mul(polarization.Ex, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
+            vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
+            vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
+
+            polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
+            polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
+
+          } else {
+            // spherical light source
+            polarization.Ex *= pow(cos(z), 2.0);
+            polarization.Ey *= pow(cos(z), 2.0);
+          }
 
           lights_polarizations[light_source_index] = polarization;
 
