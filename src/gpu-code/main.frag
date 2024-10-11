@@ -8,6 +8,7 @@ uniform vec2 viewport_dimensions;
 uniform float time;
 uniform float cube_scaling_factor;
 uniform uint light_sources_count;
+uniform float background_light_min;
 
 uniform uint lights_definitions_indices[166];
 uniform uint objects[3000];
@@ -711,13 +712,22 @@ void main() {
             vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
             vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
 
-            polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
-            polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
-
-          } else {
+            if (dot(light_dir, ray.current_real_position - light_object.center) > 0.0) {
+              polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
+              polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
+            } else {
+              polarization.Ex = vec2(0.0);
+              polarization.Ey = vec2(0.0);
+            }
+          } else if (false) {
             // spherical light source
-            polarization.Ex *= pow(cos(z), 2.0);
-            polarization.Ey *= pow(cos(z), 2.0);
+            float A = 1.0;
+            float r = length(ray.current_real_position - light_object.center) * cube_scaling_factor;
+
+            polarization.Ex = cx_mul(polarization.Ex, cx_mul(vec2(A/r, 0.0), cx_exp(vec2(0.0, r)))) * 200.0;
+            polarization.Ey = cx_mul(polarization.Ey, cx_mul(vec2(A/r, 0.0), cx_exp(vec2(0.0, r)))) * 200.0;
+          } else {
+
           }
 
           lights_polarizations[light_source_index] = polarization;
@@ -745,6 +755,7 @@ void main() {
       vec2 Ex = final_electric_field.Ex;
       vec2 Ey = final_electric_field.Ey;
       float result = pow(cx_abs(cx_add(Ex, Ey)), 2.0);
+      result = max(background_light_min, result);
 
       ray.color *= result;
     }

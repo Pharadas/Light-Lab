@@ -109,6 +109,8 @@ impl eframe::App for MainApp {
 
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"));
 
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.0..=1.0).text("Minimum background light"));
+
                         if self.menus.should_display_debug_menu {
                             if ui.add(Button::new("Hide debug menu")).clicked() {
                                 self.menus.should_display_debug_menu = false;
@@ -282,7 +284,8 @@ pub struct MainGlowProgram {
     pub objects_found: Vec<u8>,
     pub desired_scaling_factor: f32,
     pub cube_scaling_factor: f32,
-    pub currently_selected_object: usize
+    pub currently_selected_object: usize,
+    pub background_light_min: f32
 }
 
 #[allow(unsafe_code)] // we need unsafe code to use glow
@@ -427,7 +430,8 @@ impl MainGlowProgram {
                 objects_found: vec![0u8],
                 desired_scaling_factor: 0.25,
                 cube_scaling_factor: 10.0,
-                currently_selected_object: 0
+                currently_selected_object: 0,
+                background_light_min: 0.5,
             })
         }
     }
@@ -497,6 +501,11 @@ impl MainGlowProgram {
             gl.uniform_1_f32(
                 gl.get_uniform_location(self.main_image_program, "time").as_ref(),
                 time
+            );
+
+            gl.uniform_1_f32(
+                gl.get_uniform_location(self.main_image_program, "background_light_min").as_ref(),
+                self.background_light_min
             );
 
             gl.uniform_1_f32(
