@@ -419,11 +419,12 @@ impl MenusState {
         if ui.add(Button::new("Create object in your position")).clicked() {
             // we want to spawn the object a bit ahead from the viewer's look at direction
 
-            let ray_dir_y = rotate3d_y(Vector3::new(0.0, 0.0, 1.0), viewer_look_at_direction.x);
-            let ray_dir_x = rotate3d_x(Vector3::new(0.0,-1.0, 0.0), viewer_look_at_direction.y);
-            let ray_dir = (ray_dir_x + ray_dir_y).normalize() * 2.0;
+            let mut look_vector = Vector3::new(0.0, 0.0, 1.0);
+            look_vector = rotate3d_x(look_vector, viewer_look_at_direction.y);
+            look_vector = rotate3d_y(look_vector, viewer_look_at_direction.x);
+            look_vector = (look_vector).normalize() * 2.0;
 
-            let create_object_position = viewer_position + ray_dir;
+            let create_object_position = viewer_position + look_vector;
             self.object_creation_state.center = [create_object_position[0], create_object_position[1], create_object_position[2]];
             self.object_creation_state.color = self.selected_color;
 
