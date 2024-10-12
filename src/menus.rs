@@ -213,7 +213,6 @@ impl MenusState {
 
         ui.painter().with_clip_rect(response.rect).extend(shapes);
 
-
         if world.objects[*selected_object_index].object_type == ObjectType::LightSource {
             ui.add(Label::new("Light polarization"));
 

@@ -753,7 +753,7 @@ void main() {
       vec2 Ex = final_electric_field.Ex;
       vec2 Ey = final_electric_field.Ey;
       // float result = pow(cx_abs(cx_add(Ex, Ey)), 2.0);
-      float result = cx_abs(cx_add(cx_mul(Ex, cx_conj(Ex)), cx_mul(Ey, cx_conj(Ey))));
+      float result = cx_add(cx_mul(Ex, cx_conj(Ex)), cx_mul(Ey, cx_conj(Ey))).x;
       result = max(background_light_min, result);
 
       ray.color *= result;

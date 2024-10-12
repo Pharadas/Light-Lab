@@ -6,10 +6,10 @@ use eframe::egui_glow;
 use egui::{mutex::Mutex, Button, Color32, ColorImage, ImageData, Rect, TextureOptions};
 use egui_glow::glow;
 use image::RgbaImage;
-use nalgebra::{Complex, Matrix2, Vector2, Vector3};
+use nalgebra::Vector2;
 use web_sys::console;
 
-use crate::{camera::Camera, menus::MenusState, world::{self, LightPolarizationType, ObjectType, World, WorldObject}};
+use crate::{camera::Camera, menus::MenusState, world::{World, WorldObject}};
 
 pub struct MainApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
@@ -76,9 +76,9 @@ impl MainApp {
         );
 
         // load demo
-        let mut demo_world = World::new();
-        let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 164, alignment: world::Alignment::FRONT, aligned_distance: 0.5, object_aligned_to_self: 0 };
-        let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 165 };
+        let demo_world = World::new();
+        // let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 164, alignment: world::Alignment::FRONT, aligned_distance: 0.5, object_aligned_to_self: 0 };
+        // let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 165 };
         // let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 0 };
         // demo_world.aligned_objects.insert(165);
 
@@ -110,6 +110,37 @@ impl eframe::App for MainApp {
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"));
 
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.0..=1.0).text("Minimum background light"));
+
+                        let selected_object_text: String;
+
+                        if self.glow_program.lock().currently_selected_object == 0 {
+                            selected_object_text = "No selected object".to_string();
+                        } else {
+                            selected_object_text = format!("Selected object with index: {}", self.glow_program.lock().currently_selected_object);
+                        }
+
+                        egui::ComboBox::from_label("Currently selected object index")
+                            .selected_text(selected_object_text)
+                            .show_ui(ui, |ui| {
+                                let existing_object_indices = self.world.objects_associations.keys().clone();
+
+                                for object_index in existing_object_indices {
+                                    ui.selectable_value(&mut self.glow_program.lock().currently_selected_object, *object_index, format!("{}", object_index));
+                                }
+
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearHorizontal, "Linear horizontal");
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearVertical, "Linear vertical");
+
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearDiagonal, "Linear rotated 45 degrees");
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::LinearAntiDiagonal, "Linear rotated -45 degrees");
+
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::CircularRightHand, "Right circular");
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::CircularLeftHand, "Left circular");
+
+                                // ui.selectable_value(&mut self.selected_light_polarization, LightPolarizationType::NotPolarized, "Not polarized");
+                            }
+                        );
+
 
                         if self.menus.should_display_debug_menu {
                             if ui.add(Button::new("Hide debug menu")).clicked() {

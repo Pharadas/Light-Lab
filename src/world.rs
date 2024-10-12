@@ -413,7 +413,6 @@ impl WorldObject {
             },
 
             LightPolarizationType::LinearAntiDiagonal => {
-                console::log_1(&"gaming time".into());
                 self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(-1.0, 0.0)).map(|x| x * (1.0 / (2.0).sqrt()));
             },
 
