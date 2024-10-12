@@ -30,8 +30,8 @@ pub struct MenusState {
 // rand doesnt work good with wasm, so we will just generate them
 fn generate_colors_list() -> Vec<[u8; 4]> {
     vec![
-        [0, 0, 0, 255],
-        [164,138,150, 255],
+        [250, 100, 0, 255],
+        [164,250,150, 255],
         [9,62,36, 255],
         [200,40,235, 255],
         [52,112,129, 255],
@@ -51,7 +51,7 @@ impl MenusState {
         return MenusState {
             selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
-            selected_color: Color32::from_rgb(178, 127, 127),
+            selected_color: Color32::from_rgb(250, 50, 250),
             selected_light_polarization: LightPolarizationType::LinearHorizontal,
             angle: 0f32,
             relative_phase_retardation: 0f32,
@@ -184,6 +184,8 @@ impl MenusState {
         }
 
         let mut shapes = vec![];
+
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.05..=0.5).text("Tamano del objeto"));
 
         ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], -PI..=PI).text("X rotation"));
         ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], -PI..=PI).text("Y rotation"));
@@ -428,6 +430,17 @@ impl MenusState {
             self.object_creation_state.color = self.selected_color;
 
             world.insert_object(Vector3::from_vec(create_object_position.as_slice().into_iter().map(|x| *x as i32).collect()), self.object_creation_state.clone());
+
+            // just reset the selected color at the end
+            let colors = generate_colors_list();
+            let number_of_existing_objects = world.objects_associations.keys().len();
+            let selected_color = Color32::from_rgb(
+                colors[number_of_existing_objects % 12][0],
+                colors[number_of_existing_objects % 12][1],
+                colors[number_of_existing_objects % 12][2],
+            );
+
+            self.selected_color = selected_color;
         }
     }
 }

@@ -214,8 +214,18 @@ impl World {
 
     // this should return an ok, in case the objects list is full and we can't add
     // anything here
-    pub fn insert_object(&mut self, position: Vector3<i32>, object_definition: WorldObject) -> usize {
+    pub fn insert_object(&mut self, mut position: Vector3<i32>, mut object_definition: WorldObject) -> usize {
         // this line should possibly return an ok
+        position.x = position.x.clamp(2, 23);
+        position.y = position.y.clamp(2, 23);
+        position.z = position.z.clamp(2, 23);
+
+        object_definition.center[0] = object_definition.center[0].clamp(2.0, 23.0);
+        object_definition.center[1] = object_definition.center[1].clamp(2.0, 23.0);
+        object_definition.center[2] = object_definition.center[2].clamp(2.0, 23.0);
+
+        console::log_1(&format!("Creating object in position {:?}", position).into());
+
         let available_index = self.objects_stack.pop().unwrap();
         let mut object_positions = vec![];
 
@@ -227,7 +237,7 @@ impl World {
             }
 
             ObjectType::LightSource => {
-                let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
+                let center = [position[0] as u32, position[1] as u32, position[2] as u32];
                 let truncated_radius = object_definition.radius as u32 + 1;
 
                 for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
@@ -246,7 +256,7 @@ impl World {
             ObjectType::OpticalObjectRoundWall |
             ObjectType::SquareWall             |
             ObjectType::OpticalObjectSquareWall => {
-                let center = [object_definition.center[0] as u32, object_definition.center[1] as u32, object_definition.center[2] as u32];
+                let center = [position[0] as u32, position[1] as u32, position[2] as u32];
                 let truncated_radius = object_definition.radius as u32 + 1;
 
                 for x in (center[0] - truncated_radius)..=(center[0] + truncated_radius) {
@@ -388,9 +398,9 @@ impl WorldObject {
 
         self.center = [aligned_to_object.center[0] + ray_dir.x, aligned_to_object.center[1] + ray_dir.y, aligned_to_object.center[2] + ray_dir.z];
 
-        self.center[0] = self.center[0].clamp(0.5, 24.5);
-        self.center[1] = self.center[1].clamp(0.5, 24.5);
-        self.center[2] = self.center[2].clamp(0.5, 24.5);
+        self.center[0] = self.center[0].clamp(1.0, 24.0);
+        self.center[1] = self.center[1].clamp(1.0, 24.0);
+        self.center[2] = self.center[2].clamp(1.0, 24.0);
     }
 
     pub fn set_light_polarization(&mut self) {
