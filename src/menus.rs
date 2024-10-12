@@ -52,7 +52,7 @@ impl MenusState {
             selected_object: None,
             selected_polarizer_type: PolarizerType::LinearHorizontal,
             selected_color: Color32::from_rgb(178, 127, 127),
-            selected_light_polarization: LightPolarizationType::NotPolarized,
+            selected_light_polarization: LightPolarizationType::LinearHorizontal,
             angle: 0f32,
             relative_phase_retardation: 0f32,
             circularity: 0f32,
@@ -229,7 +229,7 @@ impl MenusState {
                     ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularRightHand, "Right circular");
                     ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularLeftHand, "Left circular");
 
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::NotPolarized, "Not polarized");
+                    // ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::NotPolarized, "Not polarized");
                 }
             );
 

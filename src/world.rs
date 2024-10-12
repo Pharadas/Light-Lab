@@ -95,7 +95,7 @@ impl Display for LightPolarizationType {
             Self::LinearVertical => write!(f, "Linear vertical"),
 
             Self::LinearDiagonal => write!(f, "Linear rotated 45 degrees"),
-            Self::LinearAntiDiagonal => write!(f, "Linear rotated θ degrees"),
+            Self::LinearAntiDiagonal => write!(f, "Linear rotated -45 degrees"),
 
             Self::CircularRightHand => write!(f, "Right circular"),
             Self::CircularLeftHand => write!(f, "Left circular"),
@@ -356,7 +356,7 @@ impl WorldObject {
             polarization: Vector2::new(Complex::new(0.0, 0.0), Complex::new(0.0, 0.0)),
             jones_matrix: Matrix2::zeros(),
 
-            polarization_type: LightPolarizationType::NotPolarized,
+            polarization_type: LightPolarizationType::LinearHorizontal,
 
             aligned_to_object: 0,
             alignment: Alignment::FRONT,
@@ -413,6 +413,7 @@ impl WorldObject {
             },
 
             LightPolarizationType::LinearAntiDiagonal => {
+                console::log_1(&"gaming time".into());
                 self.polarization = Vector2::new(Complex::new(1.0, 0.0), Complex::new(-1.0, 0.0)).map(|x| x * (1.0 / (2.0).sqrt()));
             },
 

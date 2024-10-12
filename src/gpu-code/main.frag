@@ -651,16 +651,14 @@ void main() {
         if ((past_plane_product_light > 0.0 && past_plane_product_ray < 0.0) || (past_plane_product_light < 0.0 && past_plane_product_ray > 0.0)) {
           out_color = vec4(0.0, 0.0, 0.0, 1.0);
           ray_facing_light = false;
-          // bad code, return too early
-          return;
+          ray_facing_light = false;
         }
 
       } else if (object_hit.type == CUBE_WALL) {
         if (dot(vec3(ray.map_pos) - light_object.center, vec3(ray.mask) * -ray.dir) > 0.0) {
           out_color = vec4(0.0, 0.0, 0.0, 1.0);
           ray_facing_light = false;
-          // bad code, return too early
-          return;
+          ray_facing_light = false;
         }
       }
 
@@ -719,7 +717,7 @@ void main() {
               polarization.Ex = vec2(0.0);
               polarization.Ey = vec2(0.0);
             }
-          } else if (false) {
+          } else if (true) {
             // spherical light source
             float A = 1.0;
             float r = length(ray.current_real_position - light_object.center) * cube_scaling_factor;
@@ -754,7 +752,8 @@ void main() {
       // color *= pow(cx_abs(final_electric_field.Ex), 2) + pow(cx_abs(final_electric_field.Ey), 2) + 0.2;
       vec2 Ex = final_electric_field.Ex;
       vec2 Ey = final_electric_field.Ey;
-      float result = pow(cx_abs(cx_add(Ex, Ey)), 2.0);
+      // float result = pow(cx_abs(cx_add(Ex, Ey)), 2.0);
+      float result = cx_abs(cx_add(cx_mul(Ex, cx_conj(Ex)), cx_mul(Ey, cx_conj(Ey))));
       result = max(background_light_min, result);
 
       ray.color *= result;
