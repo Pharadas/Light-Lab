@@ -26,3 +26,18 @@ However, one passes through a phase rotator of PI degrees, described with the fo
 https://github.com/Pharadas/RayCastingLightSimulation/assets/60682906/9ba8dcb3-33a2-43d4-9464-6f1f53babb28
 
 As expected, we only see constructive interference on the rays that passed through the rotator, everywhere else we see destructive interference.
+
+Some examples:
+Multiple unorganized light sources with the same polarization
+![image](https://github.com/user-attachments/assets/b6603ea4-fe58-4f82-9dfd-26fc08e2838a)
+
+Multiple organized light sources with the same polarization
+![image](https://github.com/user-attachments/assets/f561c0d3-2fd2-4333-8c9a-7823211275be)
+
+Multiple light sources in a diamond shape
+![image](https://github.com/user-attachments/assets/9cbd3ed7-ffaf-455a-9134-c3f1ccdbe4d8)
+
+3 slit experiment
+![image](https://github.com/user-attachments/assets/bb666354-43a9-4514-8916-1b5da724a9d3)
+Expected intensity distribution:
+![image](https://github.com/user-attachments/assets/2e189db8-f561-4f0c-af2e-54720e7557c6)
