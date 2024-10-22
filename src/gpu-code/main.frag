@@ -10,7 +10,7 @@ uniform float cube_scaling_factor;
 uniform uint light_sources_count;
 uniform float background_light_min;
 
-uniform uint lights_definitions_indices[166];
+uniform uint lights_definitions_indices[128];
 uniform uint objects[3000];
 uniform uint buckets[1000];
 // to be able to use WorldObject objects_definitions[] i'd have to have
@@ -35,7 +35,7 @@ const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using
 const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
 
-const uint OBJECT_SIZE = uint(24);
+const uint OBJECT_SIZE = uint(25);
 
 // Complex matrix =
 // |a b|
@@ -69,6 +69,7 @@ struct WorldObject {
   Polarization polarization;
   // Will only be relevant if it's an optical object
   Complex2x2Matrix jones_matrix;
+  float wavelength;
 };
 
 struct RayObject {
@@ -94,8 +95,8 @@ struct RayObject {
 
   vec4 color;
   uint object_hit;
-  // Complex2x2Matrix optical_objects_found_product;
-  // int optical_objects_through_which_it_passed;
+  Complex2x2Matrix optical_objects_found_product;
+  int optical_objects_through_which_it_passed;
 };
 
 struct ObjectGoal {
@@ -290,6 +291,8 @@ WorldObject get_object_at_index(uint object_index) {
 
     selected_object.jones_matrix.d.x = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(22)]);
     selected_object.jones_matrix.d.y = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(23)]);
+
+    selected_object.wavelength = uintBitsToFloat(objects_definitions[(object_index * OBJECT_SIZE) + uint(24)]);
 
     return selected_object;
 }
@@ -494,14 +497,10 @@ vec3 object_hit_distance(WorldObject selected_object, RayObject ray) {
   return vec3(-1.0);
 }
 
-// TODO find a better name, it doesn't only iterate, it tries to reach a goal
-// the ray will simply iterate over the space in the direction it's facing trying to hit a 'solid' object
-// Walls: will stop
-// Models: will stop
-// Mirrors: will bounce off the mirror and continue iterating
-// Light source: will stop
-// Optical Object: will multiply it's internal jones matrix and continue iterating
-bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
+bool iterateRayTowardsLightSource(inout RayObject ray, ObjectGoal goal) {
+  bool is_first_object = true;
+  bool found_first_optical_object = false;
+
   for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
     step_ray(ray);
 
@@ -521,12 +520,28 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
         vec3 pos_hit = object_hit_distance(object, ray);
         float curr_distance_traveled = length(pos_hit - ray.pos);
 
-        bool is_valid_collision_target = (!current_goal.has_goal) || (object.type != LIGHT_SOURCE) || (objects[(current_index * uint(3)) + uint(1)] == current_goal.goal_index);
+        bool is_valid_collision_target = (object.type != LIGHT_SOURCE) || (objects[(current_index * uint(3)) + uint(1)] == goal.goal_index);
 
         if (all(greaterThan(pos_hit, vec3(-0.5))) && curr_distance_traveled < min_distance && is_valid_collision_target) {
-          found_at_least_one_object = true;
-          closest_object_index = current_index;
-          min_distance = curr_distance_traveled;
+          if (object.type == OPTICAL_OBJECT_ROUND_WALL) {
+            ray.optical_objects_through_which_it_passed += 1;
+
+            if (!found_first_optical_object) {
+              ray.optical_objects_found_product = object.jones_matrix;
+              found_first_optical_object = true;
+
+            } else {
+              ray.optical_objects_found_product = cx_2x2_mat_mul(
+                object.jones_matrix,
+                ray.optical_objects_found_product
+              );
+            }
+
+          } else {
+            found_at_least_one_object = true;
+            closest_object_index = current_index;
+            min_distance = curr_distance_traveled;
+          }
         }
       }
 
@@ -540,25 +555,121 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
 
       WorldObject object_hit = get_object_at_index(ray.object_hit);
 
-      // if we had a goal then check if we hit it
-      if (current_goal.has_goal) {
-        if (ray.object_hit == current_goal.goal_index) {
+      if (ray.object_hit == goal.goal_index) {
           float virtual_distance_traveled = ray.distance_traveled * cube_scaling_factor;
 
-          ray.color.xyz *= 10.0 /(virtual_distance_traveled * virtual_distance_traveled);
+          ray.color.xyz *= 1.0 / (virtual_distance_traveled * virtual_distance_traveled);
           ray.color.xyz *= object_hit.color;
           return true;
-        }
-
-        // didn't hit whatever we were aiming for
-        ray.color.xyz *= 0.05;
-
-        return false;
       }
 
-      ray.color.x = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(6)]);
-      ray.color.y = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
-      ray.color.z = uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
+      ray.color.x *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(6)]);
+      ray.color.y *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
+      ray.color.z *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
+      ray.color.a = 1.0;
+
+      ray.ended_in_hit = true;
+
+      return false;
+    }
+
+    if ((ray.map_pos.x >= 25 || ray.map_pos.x < 1) || 
+        (ray.map_pos.y >= 25 || ray.map_pos.y < 1) ||
+        (ray.map_pos.z >= 25 || ray.map_pos.z < 1)
+    ) {
+      ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
+      ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
+
+      if (!ray.ended_in_hit) {
+        ray.object_hit = uint(0);
+        ray.ended_in_hit = true;
+      }
+
+      ray.color *= vec4(vec3(ray.mask) * 0.2, 1.0) + vec4(0.05);
+
+      float h = 2.0 + checker(ray.current_real_position);
+      ray.color *= vec4(h, h, h, 1);
+
+      return false;
+    }
+  }
+
+  return false;
+//    // if we had a goal then check if we hit it
+//    if (current_goal.has_goal) {
+//      if (ray.object_hit == current_goal.goal_index) {
+//        float virtual_distance_traveled = ray.distance_traveled * cube_scaling_factor;
+//
+//        ray.color.xyz *= 10.0 /(virtual_distance_traveled * virtual_distance_traveled);
+//        ray.color.xyz *= object_hit.color;
+//        return true;
+//      }
+//
+//      // didn't hit whatever we were aiming for
+//      ray.color.xyz *= 0.05;
+//
+//      return false;
+//    }
+// (!current_goal.has_goal) || (object.type != LIGHT_SOURCE) || (objects[(current_index * uint(3)) + uint(1)] == current_goal.goal_index);
+  return false;
+}
+
+// TODO find a better name, it doesn't only iterate, it tries to reach a goal
+// the ray will simply iterate over the space in the direction it's facing trying to hit a 'solid' object
+// Walls: will stop
+// Models: will stop
+// Mirrors: will bounce off the mirror and continue iterating
+// Light source: will stop
+// Optical Object: will multiply it's internal jones matrix and continue iterating
+bool iterateRayInDirection(inout RayObject ray) {
+  bool is_first_object = true;
+
+  for (int i = 0; i < MAX_RAY_STEPS; i += 1) {
+    step_ray(ray);
+
+    uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
+    uint original_index = hashed_value % uint(1000);
+    uint current_index = buckets[original_index];
+
+    float min_distance = 10000.0;
+    bool found_at_least_one_object = false;
+    uint closest_object_index = uint(0);
+
+    // search the item in the "linked list" and save the closest one
+    // a.k.a the first one we would hit
+    while (current_index != U32_MAX) {
+      if ((objects[current_index * uint(3)] == hashed_value) && (objects[(current_index * uint(3)) + uint(1)] != ray.object_hit)) {
+        WorldObject object = get_object_at_index(objects[(current_index * uint(3)) + uint(1)]);
+        vec3 pos_hit = object_hit_distance(object, ray);
+        float curr_distance_traveled = length(pos_hit - ray.pos);
+
+        if (all(greaterThan(pos_hit, vec3(-0.5))) && curr_distance_traveled < min_distance) {
+          if (object.type == OPTICAL_OBJECT_ROUND_WALL) {
+            ray.color *= 0.1;
+            ray.object_hit = objects[(current_index * uint(3)) + uint(1)];
+            ray.ended_in_hit = true;
+
+          } else {
+            found_at_least_one_object = true;
+            closest_object_index = current_index;
+            min_distance = curr_distance_traveled;
+          }
+        }
+      }
+
+      current_index = objects[(current_index * uint(3)) + uint(2)];
+    }
+
+    if (found_at_least_one_object) {
+      ray.object_hit = objects[(closest_object_index * uint(3)) + uint(1)];
+      ray.distance_traveled = min_distance;
+      ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
+
+      WorldObject object_hit = get_object_at_index(ray.object_hit);
+
+      ray.color.x *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(6)]);
+      ray.color.y *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(7)]);
+      ray.color.z *= uintBitsToFloat(objects_definitions[(ray.object_hit * OBJECT_SIZE) + uint(8)]);
       ray.color.a = 1.0;
 
       ray.ended_in_hit = true;
@@ -572,9 +683,13 @@ bool iterateRayInDirection(inout RayObject ray, ObjectGoal current_goal) {
     ) {
       ray.distance_traveled = length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
       ray.current_real_position = ray.pos + ray.dir * ray.distance_traveled;
-      ray.object_hit = uint(0);
-      ray.ended_in_hit = true;
-      ray.color = vec4(vec3(ray.mask) * 0.2, 1.0) + vec4(0.05);
+
+      if (!ray.ended_in_hit) {
+        ray.object_hit = uint(0);
+        ray.ended_in_hit = true;
+      }
+
+      ray.color *= vec4(vec3(ray.mask) * 0.2, 1.0) + vec4(0.05);
 
       float h = 2.0 + checker(ray.current_real_position);
       ray.color *= vec4(h, h, h, 1);
@@ -591,7 +706,7 @@ void main() {
   vec2 screen_pos = ((gl_FragCoord.xy / viewport_dimensions) * 2.) - 1.;
 
   vec3 camera_dir = vec3(0.0, 0.0, 0.75);
-  vec3 camera_plane_u = vec3(1.25, 0.0, 0.0);
+  vec3 camera_plane_u = vec3(1.5, 0.0, 0.0);
   vec3 camera_plane_v = vec3(0.0, 1.0, 0.0);
 
   vec3 ray_dir = camera_dir + screen_pos.x * camera_plane_u + screen_pos.y * camera_plane_v;
@@ -612,17 +727,19 @@ void main() {
     ray.current_real_position = ray.pos + ray.dir * length(vec3(ray.mask) * (ray.side_dist - ray.delta_dist));
     ray.ended_in_hit = false;
     ray.object_hit = U32_MAX;
+    ray.optical_objects_through_which_it_passed = 0;
 
   ObjectGoal empty_goal;
     empty_goal.has_goal = false;
 
   // walls are not valid objects
-  bool hit_valid_object = iterateRayInDirection(ray, empty_goal);
+  bool hit_valid_object = iterateRayInDirection(ray);
 
   WorldObject object_hit = get_object_at_index(ray.object_hit);
 
+  // turn off the lights
   if (light_sources_count != uint(0) && ray.object_hit == uint(0)) {
-    ray.color *= 0.05;
+    ray.color *= background_light_min;
   }
 
   object_found = vec4(float(ray.object_hit) / 255.0, 0.0, 0.0, 0.0);
@@ -676,7 +793,7 @@ void main() {
           bounced.mask = lessThanEqual(bounced.side_dist.xyz, min(bounced.side_dist.yzx, bounced.side_dist.zxy));
           bounced.ended_in_hit = false;
 
-        if (iterateRayInDirection(bounced, light_source_goal)) {
+        if (iterateRayTowardsLightSource(bounced, light_source_goal)) {
           vec3 light_dir = vec3(0.0, 0.0, -1.0);
           light_dir = rotate3dX(light_dir, light_object.rotation.y);
           light_dir = rotate3dY(light_dir, light_object.rotation.x);
@@ -688,16 +805,16 @@ void main() {
           float n = 1.0;
 
           Polarization polarization = light_object.polarization;
- 
-  //        if (ray_to_light.optical_objects_through_which_it_passed > 0) {
-  //          polarization = cx_2x2_mat_x_cx_pol_mul(ray_to_light.optical_objects_found_product, polarization);
-  //        }
+
+          if (bounced.optical_objects_through_which_it_passed > 0) {
+            polarization = cx_2x2_mat_x_cx_pol_mul(bounced.optical_objects_found_product, polarization);
+          }
 
           if (true) {
             // Gaussian beam definition
             // TODO: this should also be part of some light definition
-            float wavelength = 1.0;
-            float w0 = 1.0;
+            float wavelength = light_object.wavelength;
+            float w0 = 5.0;
             float z_r = (PI * w0 * w0 * n) / wavelength;
             float w_z = w0 * sqrt(1.0 + pow(z / z_r, 2.0));
             float R_z = z * (1.0 + pow(z_r / z, 2.0));
@@ -710,9 +827,13 @@ void main() {
             vec2 first_part_y_hat = cx_mul(polarization.Ey, vec2((w0 / w_z) * exp(-pow(radius, 2.0) / pow(w_z, 2.0)), 0));
             vec2 second_part = cx_exp(vec2(0.0, k * z + k * (pow(radius, 2.0) / (2.0 * R_z)) - gouy_z));
 
+            if (bounced.optical_objects_through_which_it_passed > 0) {
+              polarization = cx_2x2_mat_x_cx_pol_mul(bounced.optical_objects_found_product, polarization);
+            }
+
             if (dot(light_dir, ray.current_real_position - light_object.center) > 0.0) {
-              polarization.Ex = cx_mul(first_part_x_hat, second_part) * 50.0;
-              polarization.Ey = cx_mul(first_part_y_hat, second_part) * 50.0;
+              polarization.Ex = cx_mul(first_part_x_hat, second_part) * 5.0;
+              polarization.Ey = cx_mul(first_part_y_hat, second_part) * 5.0;
             } else {
               polarization.Ex = vec2(0.0);
               polarization.Ey = vec2(0.0);
@@ -762,3 +883,4 @@ void main() {
 
   out_color = ray.color;
 }
+

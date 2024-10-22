@@ -173,7 +173,6 @@ impl MenusState {
             }
 
         } else if ui.add(Button::new("Align to object")).clicked() {
-
             self.trying_to_align_to_object = true;
         }
 
@@ -215,56 +214,65 @@ impl MenusState {
 
         ui.painter().with_clip_rect(response.rect).extend(shapes);
 
-        if world.objects[*selected_object_index].object_type == ObjectType::LightSource {
-            ui.add(Label::new("Light polarization"));
+        match world.objects[*selected_object_index].object_type {
+            ObjectType::LightSource => {
+                ui.add(Slider::new(&mut world.objects[*selected_object_index].wavelength, 0.001..=1.0).text("Wavelength"));
+                ui.add(Label::new("Light polarization"));
 
-            egui::ComboBox::from_label("Light source polarization")
-                .selected_text(format!("{}", world.objects[*selected_object_index].polarization_type))
-                .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearHorizontal, "Linear horizontal");
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearVertical, "Linear vertical");
+                egui::ComboBox::from_label("Light source polarization")
+                    .selected_text(format!("{}", world.objects[*selected_object_index].polarization_type))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearHorizontal, "Linear horizontal");
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearVertical, "Linear vertical");
 
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearDiagonal, "Linear rotated 45 degrees");
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearAntiDiagonal, "Linear rotated -45 degrees");
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearDiagonal, "Linear rotated 45 degrees");
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::LinearAntiDiagonal, "Linear rotated -45 degrees");
 
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularRightHand, "Right circular");
-                    ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularLeftHand, "Left circular");
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularRightHand, "Right circular");
+                        ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::CircularLeftHand, "Left circular");
 
-                    // ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::NotPolarized, "Not polarized");
-                }
-            );
+                        // ui.selectable_value(&mut world.objects[*selected_object_index].polarization_type, LightPolarizationType::NotPolarized, "Not polarized");
+                    }
+                );
 
-            world.objects[*selected_object_index].set_light_polarization();
+                world.objects[*selected_object_index].set_light_polarization();
 
-            let retardation = Vector2::new(0.0, 0.0);
-            let angular_frequency = 1.0;
+                let retardation = Vector2::new(0.0, 0.0);
+                let angular_frequency = 1.0;
 
-            let jones_vector: Vector2<Complex<f32>> = Vector2::new(
-                (Complex::new(0.0f32, 1.0f32 * retardation.x)).exp(),
-                (Complex::new(0.0f32, 1.0f32 * retardation.y)).exp(),
-            ) * Complex::new(0.0f32, (-angular_frequency * time) as f32).exp();
+                let jones_vector: Vector2<Complex<f32>> = Vector2::new(
+                    (Complex::new(0.0f32, 1.0f32 * retardation.x)).exp(),
+                    (Complex::new(0.0f32, 1.0f32 * retardation.y)).exp(),
+                ) * Complex::new(0.0f32, (-angular_frequency * time) as f32).exp();
 
-            let final_jones_vector = [0, 1].map(|i| jones_vector[i] * world.objects[*selected_object_index].polarization[i]);
+                let final_jones_vector = [0, 1].map(|i| jones_vector[i] * world.objects[*selected_object_index].polarization[i]);
 
-            let real: PlotPoints = (0..1000).map(|i| {
-                [(final_jones_vector[0] * 0.001 * i as f32).real() as f64, (final_jones_vector[1] * 0.001 * i as f32).real() as f64]
-            }).collect();
+                let real: PlotPoints = (0..1000).map(|i| {
+                    [(final_jones_vector[0] * 0.001 * i as f32).real() as f64, (final_jones_vector[1] * 0.001 * i as f32).real() as f64]
+                }).collect();
 
-            let real_line = Line::new(real);
+                let real_line = Line::new(real);
 
-            let imaginary: PlotPoints = (0..1000).map(|i| {
-                [(final_jones_vector[0] * 0.001 * i as f32).imaginary() as f64, (final_jones_vector[1] * 0.001 * i as f32).imaginary() as f64]
-            }).collect();
+                let imaginary: PlotPoints = (0..1000).map(|i| {
+                    [(final_jones_vector[0] * 0.001 * i as f32).imaginary() as f64, (final_jones_vector[1] * 0.001 * i as f32).imaginary() as f64]
+                }).collect();
 
-            let imaginary_line = Line::new(imaginary);
+                let imaginary_line = Line::new(imaginary);
 
-            Plot::new("my_plot")
-                .view_aspect(2.0)
-                .include_x(1.0)
-                .include_y(1.0)
-                .include_x(-1.0)
-                .include_y(-1.0)
-                .show(ui, |plot_ui| {plot_ui.line(real_line); plot_ui.line(imaginary_line)});
+                Plot::new("my_plot")
+                    .view_aspect(2.0)
+                    .include_x(1.0)
+                    .include_y(1.0)
+                    .include_x(-1.0)
+                    .include_y(-1.0)
+                    .show(ui, |plot_ui| {plot_ui.line(real_line); plot_ui.line(imaginary_line)});
+            }
+            ObjectType::CubeWall => todo!(),
+            ObjectType::SquareWall => todo!(),
+            ObjectType::RoundWall => {}
+            ObjectType::OpticalObjectCube => {}
+            ObjectType::OpticalObjectSquareWall => todo!(),
+            ObjectType::OpticalObjectRoundWall => todo!(),
         }
 
         color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
@@ -315,7 +323,7 @@ impl MenusState {
                 //     TextureOptions::default(),
                 // );
 
-                ui.add_space(10.0);
+               ui.add_space(10.0);
 
                 self.object_creation_state.polarization_type = self.selected_light_polarization;
                 self.object_creation_state.set_light_polarization();
@@ -429,7 +437,14 @@ impl MenusState {
             self.object_creation_state.center = [create_object_position[0], create_object_position[1], create_object_position[2]];
             self.object_creation_state.color = self.selected_color;
 
-            world.insert_object(Vector3::from_vec(create_object_position.as_slice().into_iter().map(|x| *x as i32).collect()), self.object_creation_state.clone());
+            let res = world.insert_object(
+                Vector3::from_vec(create_object_position.as_slice().into_iter().map(|x| *x as i32).collect()), 
+                self.object_creation_state.clone()
+            );
+
+            if res.is_err() {
+                console::log_1(&"No space left for creating new items!".into());
+            }
 
             // just reset the selected color at the end
             let colors = generate_colors_list();

@@ -109,7 +109,7 @@ impl eframe::App for MainApp {
 
                         ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"));
 
-                        ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.0..=1.0).text("Minimum background light"));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.01..=1.0).text("Minimum background light"));
 
                         let selected_object_text: String;
 
@@ -460,7 +460,7 @@ impl MainGlowProgram {
                 current_texture_resolution: [0, 0],
                 objects_found: vec![0u8],
                 desired_scaling_factor: 0.25,
-                cube_scaling_factor: 10.0,
+                cube_scaling_factor: 2.0,
                 currently_selected_object: 0,
                 background_light_min: 0.5,
             })

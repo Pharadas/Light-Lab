@@ -34,6 +34,11 @@ impl GPUHashTable {
     }
 
     pub fn insert(&mut self, key: Vector3<u32>, val: u32)  {
+        if self.objects_left.is_empty() {
+            console::log_1(&format!("Couldnt create new object!").into());
+            return;
+        }
+
         // console::log_1(&self.objects_last.into());
 
         // if self.objects_last == 1000 {

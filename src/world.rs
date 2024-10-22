@@ -145,6 +145,7 @@ pub struct WorldObject {
     pub polarization: Vector2<Complex<f32>>,
     pub jones_matrix: Matrix2<Complex<f32>>,
     pub polarization_type: LightPolarizationType,
+    pub wavelength: f32,
 
     // these next 3 should probably be an option for correctness
     pub aligned_to_object: usize,
@@ -159,7 +160,7 @@ pub struct WorldObject {
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
-    pub objects: [WorldObject; 166],
+    pub objects: [WorldObject; 128],
     pub aligned_objects: HashSet<usize>,
     // would be an array but i want to be able to use pop()
     // to remove an item but keep the memory contiguous
@@ -172,10 +173,10 @@ impl World {
     pub fn new() -> World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
-            objects: [WorldObject::new(); 166],
+            objects: [WorldObject::new(); 128],
             aligned_objects: HashSet::new(),
             light_sources: vec![],
-            objects_stack: (1..166).collect(),
+            objects_stack: (1..128).collect(),
             objects_associations: HashMap::new()
         }
     }
@@ -214,8 +215,7 @@ impl World {
 
     // this should return an ok, in case the objects list is full and we can't add
     // anything here
-    pub fn insert_object(&mut self, mut position: Vector3<i32>, mut object_definition: WorldObject) -> usize {
-        // this line should possibly return an ok
+    pub fn insert_object(&mut self, mut position: Vector3<i32>, mut object_definition: WorldObject) -> Result<usize, ()> {
         position.x = position.x.clamp(2, 23);
         position.y = position.y.clamp(2, 23);
         position.z = position.z.clamp(2, 23);
@@ -225,6 +225,10 @@ impl World {
         object_definition.center[2] = object_definition.center[2].clamp(2.0, 23.0);
 
         console::log_1(&format!("Creating object in position {:?}", position).into());
+
+        if self.objects_stack.is_empty() {
+            return Err(());
+        }
 
         let available_index = self.objects_stack.pop().unwrap();
         let mut object_positions = vec![];
@@ -276,7 +280,7 @@ impl World {
         console::log_1(&format!("{:?}", available_index).into());
         self.objects_associations.insert(available_index, object_positions);
         self.objects[available_index] = object_definition;
-        return available_index;
+        return Ok(available_index);
     }
 
     pub fn update_object_position(&mut self, object_index: usize, object_definition: WorldObject) {
@@ -345,6 +349,8 @@ impl World {
 
                 object.jones_matrix[3].real().to_bits(),
                 object.jones_matrix[3].imaginary().to_bits(),
+
+                object.wavelength.to_bits(),
             ]
         }).collect()
     }
@@ -367,6 +373,8 @@ impl WorldObject {
             jones_matrix: Matrix2::zeros(),
 
             polarization_type: LightPolarizationType::LinearHorizontal,
+
+            wavelength: 0.1,
 
             aligned_to_object: 0,
             alignment: Alignment::FRONT,
