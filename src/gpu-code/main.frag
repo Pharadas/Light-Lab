@@ -559,7 +559,7 @@ bool iterateRayTowardsLightSource(inout RayObject ray, ObjectGoal goal) {
           float virtual_distance_traveled = ray.distance_traveled * cube_scaling_factor;
 
           ray.color.xyz *= 1.0 / (virtual_distance_traveled * virtual_distance_traveled);
-          ray.color.xyz *= object_hit.color;
+          ray.color.xyz *= object_hit.color * 10.0;
           return true;
       }
 
@@ -594,23 +594,6 @@ bool iterateRayTowardsLightSource(inout RayObject ray, ObjectGoal goal) {
     }
   }
 
-  return false;
-//    // if we had a goal then check if we hit it
-//    if (current_goal.has_goal) {
-//      if (ray.object_hit == current_goal.goal_index) {
-//        float virtual_distance_traveled = ray.distance_traveled * cube_scaling_factor;
-//
-//        ray.color.xyz *= 10.0 /(virtual_distance_traveled * virtual_distance_traveled);
-//        ray.color.xyz *= object_hit.color;
-//        return true;
-//      }
-//
-//      // didn't hit whatever we were aiming for
-//      ray.color.xyz *= 0.05;
-//
-//      return false;
-//    }
-// (!current_goal.has_goal) || (object.type != LIGHT_SOURCE) || (objects[(current_index * uint(3)) + uint(1)] == current_goal.goal_index);
   return false;
 }
 
@@ -832,13 +815,14 @@ void main() {
             }
 
             if (dot(light_dir, ray.current_real_position - light_object.center) > 0.0) {
-              polarization.Ex = cx_mul(first_part_x_hat, second_part) * 5.0;
-              polarization.Ey = cx_mul(first_part_y_hat, second_part) * 5.0;
+              polarization.Ex = cx_mul(first_part_x_hat, second_part) * 2.0;
+              polarization.Ey = cx_mul(first_part_y_hat, second_part) * 2.0;
             } else {
               polarization.Ex = vec2(0.0);
               polarization.Ey = vec2(0.0);
             }
-          } else if (true) {
+
+          } else if (false) {
             // spherical light source
             float A = 1.0;
             float r = length(ray.current_real_position - light_object.center) * cube_scaling_factor;

@@ -272,7 +272,7 @@ impl MenusState {
             ObjectType::RoundWall => {}
             ObjectType::OpticalObjectCube => {}
             ObjectType::OpticalObjectSquareWall => todo!(),
-            ObjectType::OpticalObjectRoundWall => todo!(),
+            ObjectType::OpticalObjectRoundWall => {}
         }
 
         color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
