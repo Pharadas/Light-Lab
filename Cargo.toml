@@ -1,6 +1,6 @@
 [package]
 name = "light_lab"
-version = "1.0.4"
+version = "1.0.5"
 authors = ["David <davidsudo18@gmail.com>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
@@ -34,7 +34,7 @@ nalgebra = "0.33.0"
 version = "0.3"
 features = [
   "Window",
-  "console"
+  "console",
 ]
 
 # native:

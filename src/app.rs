@@ -486,8 +486,11 @@ impl MainGlowProgram {
 
         unsafe {
             gl.use_program(Some(self.main_image_program));
+            let window = web_sys::window().unwrap();
+            let width = window.outer_width().unwrap().as_f64().unwrap() as f32;
+            let height = window.outer_width().unwrap().as_f64().unwrap() as f32;
 
-            let texture_resolution = [(window_rect.width() * resolution_multiplier) as i32, (window_rect.height() * resolution_multiplier) as i32];
+            let texture_resolution = [(width * resolution_multiplier) as i32, (height * resolution_multiplier) as i32];
 
             self.current_texture_resolution = texture_resolution;
 
