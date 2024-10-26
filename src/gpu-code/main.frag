@@ -10,12 +10,16 @@ uniform float cube_scaling_factor;
 uniform uint light_sources_count;
 uniform float background_light_min;
 
-uniform uint lights_definitions_indices[128];
-uniform uint objects[3000];
-uniform uint buckets[1000];
+#define OBJECT_SIZE uint(25)
+#define NUM_OBJECTS uint(32)
+#define SIZE_BUCKETS uint(200)
+
+uniform uint lights_definitions_indices[NUM_OBJECTS];
+uniform uint objects[900];
+uniform uint buckets[SIZE_BUCKETS];
 // to be able to use WorldObject objects_definitions[] i'd have to have
 // sent it in a compatible alignment, not doin that tho
-uniform uint objects_definitions[4000];
+uniform uint objects_definitions[OBJECT_SIZE * NUM_OBJECTS];
 
 layout(location = 0) out vec4 out_color;
 layout(location = 1) out vec4 object_found;
@@ -34,8 +38,6 @@ const uint LIGHT_SOURCE = uint(3);                // Sphere that represents a li
 const uint OPTICAL_OBJECT_CUBE = uint(4);         // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_SQUARE_WALL = uint(5);  // An object represented using a jones matrix
 const uint OPTICAL_OBJECT_ROUND_WALL = uint(6);   // An object represented using a jones matrix
-
-const uint OBJECT_SIZE = uint(25);
 
 // Complex matrix =
 // |a b|
@@ -505,7 +507,7 @@ bool iterateRayTowardsLightSource(inout RayObject ray, ObjectGoal goal) {
     step_ray(ray);
 
     uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
-    uint original_index = hashed_value % uint(1000);
+    uint original_index = hashed_value % SIZE_BUCKETS;
     uint current_index = buckets[original_index];
 
     float min_distance = 10000.0;
@@ -611,7 +613,7 @@ bool iterateRayInDirection(inout RayObject ray) {
     step_ray(ray);
 
     uint hashed_value = hash(ray.map_pos + ivec3(100, 100, 100));
-    uint original_index = hashed_value % uint(1000);
+    uint original_index = hashed_value % SIZE_BUCKETS;
     uint current_index = buckets[original_index];
 
     float min_distance = 10000.0;

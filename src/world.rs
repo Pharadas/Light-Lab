@@ -160,7 +160,7 @@ pub struct WorldObject {
 #[derive(Debug, Clone)]
 pub struct World {
     pub hash_map: GPUHashTable,
-    pub objects: [WorldObject; 128],
+    pub objects: [WorldObject; 32],
     pub aligned_objects: HashSet<usize>,
     // would be an array but i want to be able to use pop()
     // to remove an item but keep the memory contiguous
@@ -173,10 +173,10 @@ impl World {
     pub fn new() -> World {
         return World {
             hash_map: GPUHashTable::new(Vector3::new(200, 200, 200)),
-            objects: [WorldObject::new(); 128],
+            objects: [WorldObject::new(); 32],
             aligned_objects: HashSet::new(),
             light_sources: vec![],
-            objects_stack: (1..128).collect(),
+            objects_stack: (1..32).collect(),
             objects_associations: HashMap::new()
         }
     }
