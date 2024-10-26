@@ -21,9 +21,9 @@ pub struct GPUHashTable {
 impl GPUHashTable {
     pub fn new(block_size: Vector3<u32>) -> GPUHashTable {
         return GPUHashTable {
-            buckets: vec![u32::MAX; 200], // capacity hard coded for now
-            objects: vec![KeyValue {key: 0, value: 0, next: u32::MAX}; 300], // capacity hard coded for now
-            objects_left: (0..300).collect(),
+            buckets: vec![u32::MAX; 100], // capacity hard coded for now
+            objects: vec![KeyValue {key: 0, value: 0, next: u32::MAX}; 250], // capacity hard coded for now
+            objects_left: (0..250).collect(),
             block_size,
         };
     }
@@ -47,7 +47,7 @@ impl GPUHashTable {
         // }
 
         let original_hash = self.hash(key);
-        let index = (original_hash % 200) as usize;
+        let index = (original_hash % 100) as usize;
         console::log_1(&format!("creating object and putting it at index: {:?}", index).into());
 
         let mut current_object: KeyValue;
@@ -93,7 +93,7 @@ impl GPUHashTable {
 
     pub fn remove(&mut self, key: Vector3<u32>, val: u32) -> Result<(), String> {
         let original_hash = self.hash(key);
-        let bucket_index = (original_hash % 200) as usize;
+        let bucket_index = (original_hash % 100) as usize;
 
         // if we reach this part of the code, then this bucket isn't empty, let's find the last item of
         // the bucket by following it as a linked list
