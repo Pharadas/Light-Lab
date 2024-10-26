@@ -7,5 +7,6 @@ mod world;
 mod menus;
 mod tests;
 mod util;
+mod demos;
 
 pub use app::MainApp;

@@ -75,20 +75,9 @@ impl MainApp {
             TextureOptions::default(),
         );
 
-        // load demo
-        let demo_world = World::new();
-        // let demo_red_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [10.257881, 2.1159875, 11.990719], color: Color32::from_rgb(255, 1, 1), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 164, alignment: world::Alignment::FRONT, aligned_distance: 0.5, object_aligned_to_self: 0 };
-        // let demo_blue_light = WorldObject { object_type: ObjectType::LightSource, rotation: [0.01, 1.5707964], center: [11.257681, 2.1159875, 12.010717], color: Color32::from_rgb(1, 1, 255), width: 0.5, height: 0.5, radius: 0.1, polarization: Vector2::new(Complex { re: 1.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::LinearHorizontal, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 165 };
-        // let demo_wall = WorldObject { object_type: ObjectType::RoundWall, rotation: [3.1415927, 0.85794735], center: [10.26795, 3.0669506, 16.072115], color: Color32::from_rgb(21, 122, 189), width: 0.5, height: 0.5, radius: 0.5, polarization: Vector2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), jones_matrix: Matrix2::new(Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }, Complex { re: 0.0, im: 0.0 }), polarization_type: LightPolarizationType::NotPolarized, aligned_to_object: 0, alignment: world::Alignment::FRONT, aligned_distance: 0.0, object_aligned_to_self: 0 };
-        // demo_world.aligned_objects.insert(165);
-
-        // demo_world.insert_object(Vector3::from_vec(demo_red_light.center.into_iter().map(|x| x as i32).collect()), demo_red_light);
-        // demo_world.insert_object(Vector3::from_vec(demo_blue_light.center.into_iter().map(|x| x as i32).collect()), demo_blue_light);
-        // demo_world.insert_object(Vector3::from_vec(demo_wall.center.into_iter().map(|x| x as i32).collect()), demo_wall);
-
         Some(Self {
             glow_program: Arc::new(Mutex::new(MainGlowProgram::new(gl)?)),
-            world: demo_world,
+            world: World::new(),
             camera: Camera::new(),
             time: 0.0,
             menus: MenusState::new(screen_texture, debug_texture, all_images, image_sizes)
@@ -105,11 +94,14 @@ impl eframe::App for MainApp {
                 .show(ui, |ui| {
                     egui::Window::new("Main menu").show(ctx, |ui| {
                         ui.label(format!("Current position: {:?}, {:?}, {:?}", self.camera.position.x.round(), self.camera.position.y.round(), self.camera.position.z.round()));
-                        ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().desired_scaling_factor, 0.1..=1.0).text("Scaling factor"))
+                            .on_hover_text("Ranges from 0.1 to 1.0, defines how clear the resolution is, scaling the current window size by this value, be careful as this can slow down the simulation signifcantly");
 
-                        ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().cube_scaling_factor, 0.5..=100.0).logarithmic(true).text("Cube size in meters"))
+                            .on_hover_text("Ranges from 0.5 to 100, defines the size that each block in the world represents, use this to see how some pattern changes as it approaches infinity");
 
-                        ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.01..=1.0).text("Minimum background light"));
+                        ui.add(egui::Slider::new(&mut self.glow_program.lock().background_light_min, 0.01..=1.0).text("Minimum background light"))
+                            .on_hover_text("Ranges from 0.01 to 1, defines how much background light is artificially added to the lab");
 
                         let selected_object_text: String;
 
@@ -158,6 +150,14 @@ impl eframe::App for MainApp {
                             self.menus.inspect_object_menu(ui, &mut self.world, self.time, &mut self.glow_program.lock().currently_selected_object);
                         });
                     }
+
+                    egui::Window::new("Info").show(ctx, |ui| {
+                        self.menus.info_menu(ui);
+                    });
+
+                    egui::Window::new("Demo selector").show(ctx, |ui| {
+                        self.menus.select_demo(ui, &mut self.world, &mut self.glow_program.lock());
+                    });
 
                     egui::Window::new("Object creator").show(ctx, |ui| {
                         self.menus.object_creation_menu(ui, &mut self.world, self.camera.position, Vector2::new(self.camera.look_direction.x, self.camera.look_direction.y));
@@ -235,6 +235,9 @@ impl MainApp {
 
             if !self.menus.trying_to_align_to_object {
                 self.glow_program.lock().currently_selected_object = object_found_index as usize;
+
+            } else if object_found_index == 0 {
+                self.menus.trying_to_align_to_object = false;
 
             } else {
                 self.world.objects[self.glow_program.lock().currently_selected_object].aligned_to_object = object_found_index as usize;

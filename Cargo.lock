@@ -1741,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "light_lab"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "as-bytes",
  "eframe",

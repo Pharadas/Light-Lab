@@ -7,10 +7,13 @@ use egui_plot::{Line, Plot, PlotPoints};
 use nalgebra::{Complex, ComplexField, Vector2, Vector3};
 use web_sys::console;
 
-use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, world::{Alignment, LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
+use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, demos::{coordinated_interference_demo, double_slit_demo, light_profile, no_demo, simple_interference_demo, triple_slit_demo, uncoordinated_interference_demo, Demo}, world::{Alignment, LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
     pub selected_object: Option<WorldObject>,
+    pub selected_demo: Demo, 
+    last_selected_demo: Demo, 
+
     selected_polarizer_type: PolarizerType,
     selected_light_polarization: LightPolarizationType,
     selected_color: Color32,
@@ -50,6 +53,9 @@ impl MenusState {
     pub fn new(image_texture: TextureHandle, debug_texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
             selected_object: None,
+            selected_demo: Demo::None,
+            last_selected_demo: Demo::None,
+
             selected_polarizer_type: PolarizerType::LinearHorizontal,
             selected_color: Color32::from_rgb(250, 50, 250),
             selected_light_polarization: LightPolarizationType::LinearHorizontal,
@@ -184,10 +190,12 @@ impl MenusState {
 
         let mut shapes = vec![];
 
-        ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.05..=0.5).text("Tamano del objeto"));
+        ui.add(Slider::new(&mut world.objects[*selected_object_index].radius, 0.05..=0.5).text("Object size"));
 
         ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[0], -PI..=PI).text("X rotation"));
         ui.add(Slider::new(&mut world.objects[*selected_object_index].rotation[1], -PI..=PI).text("Y rotation"));
+
+        ui.label("Drag to rotate object!");
 
         let response = Plot::new("rotation_plot")
         .allow_drag(false)
@@ -276,6 +284,179 @@ impl MenusState {
         }
 
         color_picker_color32(ui, &mut world.objects[*selected_object_index].color, egui::color_picker::Alpha::Opaque);
+    }
+
+    pub fn info_menu(&mut self, ui: &mut Ui) {
+        match self.selected_demo {
+            Demo::None => {
+                ui.label("This is a mini optics laboratory, it's main purpose is to allow everyone to understand light polarization in an intuitive and visual way");
+                ui.add_space(4.0);
+
+                ui.label("WASD to move, drag on the window to look around, click on an object you created to select it and align them to get the interference pattern just right");
+                ui.add_space(4.0);
+
+                ui.label("Try creating light sources with multiple different polarizations and see how they change across space, try creating interference and adding polarizers and phase retarders and see how they interact!");
+                ui.add_space(4.0);
+
+                ui.label("Please have fun and if anything breaks, you can raise an issue on the github repo");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://github.com/Pharadas/Light-Lab");
+            }
+
+            Demo::LightProfile => {
+                ui.label("This demo shows the profile of the every light source you create, try clicking on it and rotating it");
+                ui.add_space(4.0);
+
+                ui.label("The light is modeled as a gaussian beam (a laser light)");
+                ui.hyperlink("https://en.wikipedia.org/wiki/Gaussian_beam");
+            }
+
+            Demo::SimpleInterferenceDemo => {
+                ui.label("This demo shows an emulation of what a michaelson interferometer attempts to do, light sources in real life never share a polarization and wavelength, so with an interferometer we split a light source so that two beams have the same properties, here we can simply create two light sources with the same properties");
+                ui.add_space(4.0);
+
+                ui.label("Try selecting the red light source and moving the 'Distance from object' slider, see how it changes!");
+                ui.add_space(4.0);
+
+                ui.label("Also try creating new light sources changing their wavelengths and playing with the slider 'Cube size in meters' to see how this pattern develops as you get closer or farther from the light source");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://en.wikipedia.org/wiki/Michelson_interferometer");
+                ui.add_space(4.0);
+
+                ui.label("In this demo we are simulating configuration a:");
+                ui.hyperlink("https://upload.wikimedia.org/wikipedia/commons/0/01/Michelson_interferometer_fringe_formation.svg");
+            }
+
+            Demo::DoubleSlit => {
+                ui.label("This demo shows an approximation of the double slit experiment, in this experiment we make a single light source interact with itself, here we can simply create two light sources with the same properties and make them interact");
+                ui.add_space(4.0);
+
+                ui.label("Try selecting the red light source and moving the 'Distance from object' slider, see how it changes!");
+                ui.add_space(4.0);
+
+                ui.label("Also try creating new light sources changing their wavelengths and playing with the slider 'Cube size in meters' to see how this pattern develops as you get closer or farther from the light source");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
+                ui.add_space(4.0);
+
+                ui.label("We are simulating the bottom set of images");
+                ui.hyperlink("https://www.researchgate.net/publication/335957159/figure/fig2/AS:805377650204672@1569028403287/a-d-Interference-patterns-of-the-light-passing-through-the-axicon-interfering-with-the.ppm");
+                ui.add_space(4.0);
+            }
+
+            Demo::TripleSlit => {
+                ui.label("This demo shows an approximation of the triple slit experiment, in this experiment we make a single light source interact with itself, here we can simply create three light sources with the same properties and make them interact");
+                ui.add_space(4.0);
+
+                ui.label("Try selecting the red light source and moving the 'Distance from object' slider, see how it changes!");
+                ui.add_space(4.0);
+
+                ui.label("Also try creating new light sources changing their wavelengths and playing with the slider 'Cube size in meters' to see how this pattern develops as you get closer or farther from the light source");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
+                ui.add_space(4.0);
+
+                ui.label("Here is an example of what we are trying to simulate, note that the profile seen in the experiment is precisely what we get in this visualization");
+                ui.hyperlink("https://www.researchgate.net/publication/263025761/figure/fig1/AS:324895427842053@1454472514561/A-schematic-diagram-of-the-three-slit-interference-experiment-with-a-quantum-which-path.png");
+                ui.add_space(4.0);
+            }
+
+            Demo::UncoordinatedInterference => {
+                ui.label("This experiment demonstrates many light sources with the same polarization but all out of phase with one another");
+                ui.add_space(4.0);
+
+                ui.label("Try creating new light sources and changing their polarizations to see how they interact with the others");
+                ui.add_space(4.0);
+
+                ui.label("Also try changing their wavelengths and playing with the slider 'Cube size in meters' to see how this pattern develops as you get closer or farther from the light source");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
+                ui.add_space(4.0);
+            }
+
+            Demo::CoordinatedInterference => {
+                ui.label("This experiment demonstrates many light sources with the same polarization all in of phase with one another");
+                ui.add_space(4.0);
+
+                ui.label("Try creating new light sources and changing their polarizations to see how they interact with the others");
+                ui.add_space(4.0);
+
+                ui.label("Try deleting a few lights to create a square or a diamond");
+                ui.add_space(4.0);
+
+                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
+                ui.add_space(4.0);
+
+                ui.label("Here is an example of what we are trying to simulate, note that the profile seen in the experiment is precisely what we get in this visualization");
+                ui.hyperlink("https://www.researchgate.net/publication/263025761/figure/fig1/AS:324895427842053@1454472514561/A-schematic-diagram-of-the-three-slit-interference-experiment-with-a-quantum-which-path.png");
+                ui.add_space(4.0);
+            }
+        }
+    }
+
+    pub fn select_demo(&mut self, ui: &mut Ui, world: &mut World, glow: &mut MainGlowProgram) {
+        egui::ComboBox::from_label("Selected demo")
+            .selected_text(format!("{}", self.selected_demo))
+            .show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.selected_demo, Demo::None, "No demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::LightProfile, "Light profile demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::SimpleInterferenceDemo, "Basic interference demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::DoubleSlit, "Double slit demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::TripleSlit, "Triple slit demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::UncoordinatedInterference, "Uncoordinated interference demo");
+                ui.selectable_value(&mut self.selected_demo, Demo::CoordinatedInterference, "Coordinated interference demo");
+            }
+        );
+
+        if self.selected_demo != self.last_selected_demo {
+            let demo_world;
+
+            match self.selected_demo {
+                Demo::None => {
+                    demo_world = no_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+                Demo::LightProfile => {
+                    demo_world = light_profile();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+                Demo::SimpleInterferenceDemo => {
+                    demo_world = simple_interference_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+                Demo::DoubleSlit => {
+                    demo_world = double_slit_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+
+                Demo::TripleSlit => {
+                    demo_world = triple_slit_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+                Demo::UncoordinatedInterference => {
+                    demo_world = uncoordinated_interference_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+
+                Demo::CoordinatedInterference => {
+                    demo_world = coordinated_interference_demo();
+                    glow.cube_scaling_factor = 1.0;
+                }
+            }
+
+            *world = demo_world;
+            self.last_selected_demo = self.selected_demo;
+        }
     }
 
     pub fn object_creation_menu(&mut self, ui: &mut Ui, world: &mut World, viewer_position: Vector3<f32>, viewer_look_at_direction: Vector2<f32>) {
@@ -427,7 +608,6 @@ impl MenusState {
 
         if ui.add(Button::new("Create object in your position")).clicked() {
             // we want to spawn the object a bit ahead from the viewer's look at direction
-
             let mut look_vector = Vector3::new(0.0, 0.0, 1.0);
             look_vector = rotate3d_x(look_vector, viewer_look_at_direction.y);
             look_vector = rotate3d_y(look_vector, viewer_look_at_direction.x);
