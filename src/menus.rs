@@ -10,7 +10,6 @@ use web_sys::console;
 use crate::{app::MainGlowProgram, camera::{rotate3d_x, rotate3d_y}, demos::{coordinated_interference_demo, double_slit_demo, light_profile, no_demo, simple_interference_demo, triple_slit_demo, uncoordinated_interference_demo, Demo}, world::{Alignment, LightPolarizationType, ObjectType, PolarizerType, World, WorldObject}};
 
 pub struct MenusState {
-    pub selected_object: Option<WorldObject>,
     pub selected_demo: Demo, 
     last_selected_demo: Demo, 
 
@@ -52,7 +51,6 @@ fn generate_colors_list() -> Vec<[u8; 4]> {
 impl MenusState {
     pub fn new(image_texture: TextureHandle, debug_texture: TextureHandle, raw_images: Vec<ImageBuffer<Rgba<u8>, Vec<u8>>>, image_sizes: Vec<[usize; 2]>) -> MenusState {
         return MenusState {
-            selected_object: None,
             selected_demo: Demo::None,
             last_selected_demo: Demo::None,
 
