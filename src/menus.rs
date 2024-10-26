@@ -374,9 +374,6 @@ impl MenusState {
 
                 ui.label("Also try changing their wavelengths and playing with the slider 'Cube size in meters' to see how this pattern develops as you get closer or farther from the light source");
                 ui.add_space(4.0);
-
-                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
-                ui.add_space(4.0);
             }
 
             Demo::CoordinatedInterference => {
@@ -389,12 +386,8 @@ impl MenusState {
                 ui.label("Try deleting a few lights to create a square or a diamond");
                 ui.add_space(4.0);
 
-                ui.hyperlink("https://en.wikipedia.org/wiki/Double-slit_experiment");
-                ui.add_space(4.0);
-
-                ui.label("Here is an example of what we are trying to simulate, note that the profile seen in the experiment is precisely what we get in this visualization");
-                ui.hyperlink("https://www.researchgate.net/publication/263025761/figure/fig1/AS:324895427842053@1454472514561/A-schematic-diagram-of-the-three-slit-interference-experiment-with-a-quantum-which-path.png");
-                ui.add_space(4.0);
+                ui.label("Here is an image from a real experiment of the same effect");
+                ui.hyperlink("https://atoptics.co.uk/img/blog/venus-diffraction-gratings-opod-1.png");
             }
         }
     }
