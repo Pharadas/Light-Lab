@@ -12,7 +12,7 @@ uniform float background_light_min;
 
 #define OBJECT_SIZE uint(25)
 #define NUM_OBJECTS uint(10)
-#define SIZE_BUCKETS uint(100)
+#define SIZE_BUCKETS uint(25)
 
 uniform uint lights_definitions_indices[NUM_OBJECTS];
 uniform uint objects[699];
