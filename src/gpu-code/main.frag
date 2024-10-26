@@ -11,11 +11,11 @@ uniform uint light_sources_count;
 uniform float background_light_min;
 
 #define OBJECT_SIZE uint(25)
-#define NUM_OBJECTS uint(32)
+#define NUM_OBJECTS uint(10)
 #define SIZE_BUCKETS uint(100)
 
 uniform uint lights_definitions_indices[NUM_OBJECTS];
-uniform uint objects[750];
+uniform uint objects[699];
 uniform uint buckets[SIZE_BUCKETS];
 // to be able to use WorldObject objects_definitions[] i'd have to have
 // sent it in a compatible alignment, not doin that tho

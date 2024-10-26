@@ -22,8 +22,8 @@ impl GPUHashTable {
     pub fn new(block_size: Vector3<u32>) -> GPUHashTable {
         return GPUHashTable {
             buckets: vec![u32::MAX; 100], // capacity hard coded for now
-            objects: vec![KeyValue {key: 0, value: 0, next: u32::MAX}; 250], // capacity hard coded for now
-            objects_left: (0..250).collect(),
+            objects: vec![KeyValue {key: 0, value: 0, next: u32::MAX}; 233], // capacity hard coded for now
+            objects_left: (0..233).collect(),
             block_size,
         };
     }
