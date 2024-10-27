@@ -88,7 +88,6 @@ impl MainApp {
 impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ctx.request_repaint_after_secs(0.033);
             egui::ScrollArea::both()
                 .auto_shrink(false)
                 .show(ui, |ui| {
@@ -212,8 +211,14 @@ if let Some(gl) = gl {
 
 impl MainApp {
     fn custom_painting(&mut self, ui: &mut egui::Ui) {
+        let mut size = ui.available_size();
+        let scale = web_sys::window().unwrap().device_pixel_ratio() as f32;
+
+        size.x *= scale;
+        size.y *= scale;
+
         let (rect, response) =
-            ui.allocate_exact_size(ui.available_size(), egui::Sense::drag());
+            ui.allocate_exact_size(size, egui::Sense::drag());
 
         let curr_response = ui.interact(ui.min_rect(), egui::Id::new("Some Id"), egui::Sense::click());
         let current_texture_resolution = self.glow_program.lock().current_texture_resolution.clone();
@@ -486,11 +491,8 @@ impl MainGlowProgram {
 
         unsafe {
             gl.use_program(Some(self.main_image_program));
-            let window = web_sys::window().unwrap();
-            let width = window.outer_width().unwrap().as_f64().unwrap() as f32;
-            let height = window.outer_width().unwrap().as_f64().unwrap() as f32;
 
-            let texture_resolution = [(width * resolution_multiplier) as i32, (height * resolution_multiplier) as i32];
+            let texture_resolution = [(window_rect.width()  * resolution_multiplier) as i32, (window_rect.height() * resolution_multiplier) as i32];
 
             self.current_texture_resolution = texture_resolution;
 

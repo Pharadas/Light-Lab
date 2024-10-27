@@ -20,7 +20,8 @@ void main() {
   vec3 rgb_object_found = texture(objects_found, screen_pos).rgb;
 
   if ((selected_object != uint(0)) && (is_approx(float(selected_object), rgb_object_found.x * 255.0))) {
-    FragColor = vec4(texture(screenTexture, screen_pos).rgb * ((cos(time * 10.0) * 0.1) + 0.8), 1.);
+    // FragColor = vec4(texture(screenTexture, screen_pos).rgb * ((cos(time * 10.0) * 0.1) + 0.8), 1.);
+    FragColor = vec4(normalize(texture(screenTexture, screen_pos).rgb), 1.);
 
   } else {
     FragColor = vec4(texture(screenTexture, screen_pos).rgb, 1.);

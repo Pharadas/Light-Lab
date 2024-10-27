@@ -690,8 +690,8 @@ bool iterateRayInDirection(inout RayObject ray) {
 void main() {
   vec2 screen_pos = ((gl_FragCoord.xy / viewport_dimensions) * 2.) - 1.;
 
-  vec3 camera_dir = vec3(0.0, 0.0, 0.75);
-  vec3 camera_plane_u = vec3(1.5, 0.0, 0.0);
+  vec3 camera_dir = vec3(0.0, 0.0, 1.0);
+  vec3 camera_plane_u = vec3(1.0, 0.0, 0.0);
   vec3 camera_plane_v = vec3(0.0, 1.0, 0.0);
 
   vec3 ray_dir = camera_dir + screen_pos.x * camera_plane_u + screen_pos.y * camera_plane_v;
