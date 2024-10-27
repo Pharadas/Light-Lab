@@ -241,7 +241,7 @@ impl MainApp {
             if !self.menus.trying_to_align_to_object {
                 self.glow_program.lock().currently_selected_object = object_found_index as usize;
 
-            } else if object_found_index == 0 {
+            } else if object_found_index == 0 || object_found_index as usize == self.glow_program.lock().currently_selected_object || object_found_index as usize == self.world.objects[self.glow_program.lock().currently_selected_object].object_aligned_to_self {
                 self.menus.trying_to_align_to_object = false;
 
             } else {
